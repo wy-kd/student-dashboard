@@ -86,6 +86,79 @@ New-NetFirewallRule -DisplayName "Student Dashboard LAN" -Direction Inbound -Act
 
 HTTP on a LAN is unencrypted. Use it only on a trusted network; the optional local HTTPS configuration below encrypts the connection. Do not port-forward the app or make it internet-accessible.
 
+## Private Remote Access with Tailscale
+
+Use **Tailscale Serve** for private HTTPS access away from home, including from QUT. Install Tailscale separately on the Windows laptop and each remote phone, iPad or computer, then sign them into the **same tailnet**. Tailnet access rules must permit the remote device to reach the laptop's HTTPS service. Tailscale is not an npm dependency and the app does not install or configure it.
+
+The connection is: remote device → private tailnet → HTTPS `.ts.net` URL → Tailscale Serve on Windows → `http://127.0.0.1:3000` → Student Dashboard → local `data/student.db`.
+
+**Serve is private to your tailnet. Do not use Tailscale Funnel**, which exposes services publicly. No router port forwarding is necessary. Do not create a Windows **Public-network** rule for Node.js or port 3000. Keep any existing LAN rule restricted to **Private / Local subnet**; Serve reaches the app through loopback. Do not mark campus/public Wi-Fi Private to make the dashboard accessible.
+
+### Start the app and private HTTPS proxy
+
+1. Stop the existing app with `Ctrl+C`. In the repository folder, update and start production mode:
+
+   ```bat
+   git pull --ff-only
+   npm install
+   npm run build
+   npm run start
+   ```
+
+   Keep this terminal running. Use production mode for the Tailscale path: `npm run dev` has a separate Next.js development-origin restriction and the arbitrary `.ts.net` hostname is intentionally not wildcard-allowed. Production mode still supports `http://localhost:3000` and `http://<LAN-IP>:3000` alongside Tailscale. No hostname or `.env` change is needed.
+
+2. After installing and signing into Tailscale, open a **second terminal on the laptop**:
+
+   ```bat
+   tailscale status
+   tailscale serve 3000
+   ```
+
+   If prompted, follow Tailscale's link to enable the HTTPS/Serve prerequisites for your tailnet. Do not enable public Funnel access. Serve provisions HTTPS for your device's `.ts.net` address and terminates TLS itself; its backend remains plain HTTP on `127.0.0.1:3000`. **Caddy is unnecessary for this path.**
+
+3. Copy the exact HTTPS URL printed by Serve. It should say **Available within your tailnet** and show `/` proxying to `http://127.0.0.1:3000`. Open that URL on a device connected to the same tailnet and sign in using your **existing Student Dashboard password**. Use the printed URL without adding `:3000`; do not use `https://<LAN-IP>:3000`. Each hostname has its own login cookie, but all access the same records.
+
+4. In another terminal, inspect the configuration:
+
+   ```bat
+   tailscale serve status
+   ```
+
+5. The initial Serve command runs in the foreground. Once you have tested it, press `Ctrl+C` in **that** terminal, then enable persistent background serving:
+
+   ```bat
+   tailscale serve --bg 3000
+   tailscale serve status
+   ```
+
+   Background Serve can resume after a reboot, but it does **not** start Node.js or Student Dashboard. The host laptop must remain powered on, awake, connected to the internet and connected to Tailscale, and the dashboard server must still be running. Remote devices must also have Tailscale connected. Access at QUT depends on that network permitting the Tailscale connection.
+
+### Stop or reset Serve
+
+For the default HTTPS listener configured above:
+
+```bat
+tailscale serve off
+```
+
+If your CLI asks for matching flags after background setup, use `tailscale serve --bg off`. Check `tailscale serve status` afterwards. To remove **all Serve configuration on this laptop**, including any other services you configured:
+
+```bat
+tailscale serve reset
+```
+
+These commands do not stop Student Dashboard or delete its data. Localhost and permitted LAN access remain available while the app is running.
+
+### Application behaviour and device checks
+
+Serve preserves the browser's original `Host`. The existing write protection compares the request Origin's host and port with that Host, rejects missing/mismatched origins and cross-site browser requests, and requires JSON. The app does not use `Forwarded`, `X-Forwarded-Host` or `X-Forwarded-Proto` to bypass those checks, and it never authenticates from Tailscale identity headers. Password authentication, session expiry and login throttling remain in effect. HTTPS logins set host-only, HttpOnly, SameSite=Strict, **Secure** cookies based on the checked browser Origin; local HTTP logins continue to work on their separate hostnames.
+
+All application navigation, API calls, downloads and PWA asset URLs use the current site. The `.ts.net` HTTPS URL provides a secure context for the existing service worker and home-screen installation. Offline edits are not supported: the service worker does not cache private API data. SQLite stays at `data/student.db` on the laptop, and JSON backup/restore and CSV export use the same authenticated API through every address. There is no database migration or cloud storage change for Tailscale.
+
+On your own devices, check login, a test task saved and visible through localhost, JSON/CSV downloads, logout and home-screen launch. Test away from home using mobile data and then QUT. Automated request tests simulate Serve's headers; **physical Tailscale, iPhone/iPad and QUT testing has not been performed by this repository update**. If you see “Request blocked”, check the exact Serve URL and root proxy mapping; do not disable origin protection or add arbitrary allowed origins.
+
+References: [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve), [Serve CLI commands](https://tailscale.com/docs/reference/tailscale-cli/serve), and [Serve's HTTP proxy implementation](https://github.com/tailscale/tailscale/blob/main/ipn/ipnlocal/serve.go).
+
 ## PWA / Add to Home Screen
 
 Included: web manifest, standalone display, 192px and 512px icons, Apple touch icon and a minimal service worker. Browser support varies.
@@ -98,9 +171,9 @@ Included: web manifest, standalone display, 192px and 512px icons, Apple touch i
 
 See [MDN's installability guidance](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
 
-### Optional local HTTPS with Caddy
+### Optional LAN-only HTTPS with Caddy
 
-This remains local; no public domain or cloud hosting is needed.
+This is an optional method for HTTPS over the local LAN. It is not required for Tailscale Serve and must not be placed between Serve and Next.js. For private remote access, use the Tailscale section above. This LAN method needs no public domain or cloud hosting.
 
 1. Download [Caddy for Windows](https://caddyserver.com/download). Keep it in a folder where you can run `caddy.exe`.
 2. Copy `docs/Caddyfile.example` to a file named `Caddyfile`, replacing the example IP with your laptop's current private IP.

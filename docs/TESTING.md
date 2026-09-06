@@ -4,7 +4,7 @@
 
 - TypeScript type check passed.
 - Production Next.js build passed.
-- 16 tests cover calculation boundaries, SQLite service workflows and API handlers.
+- Tests cover calculation boundaries, SQLite service workflows and API handlers.
 - Full workflow creates a semester, subject, assignment, linked tasks, milestone, exam, revision topic, recurring class, study session and grade.
 - Completing estimated tasks changes assignment progress from 0% to 20% to 100%.
 - A 74% result weighted at 60% earns 44.4 points; reaching 75 overall requires 76.5% on the remaining 40%.
@@ -49,3 +49,17 @@ These are component interaction/layout checks, not a claim that a physical iPhon
 The app requires the laptop to be running. Offline editing, independent device databases, push notifications, timetable import, CSV import, single-class occurrence overrides and automatic free-slot scheduling are not implemented. None is presented as a working button. Alerts, local priority ranking and dated study planning work without external services.
 
 Forecasts and schedule-health labels are heuristics; confirm dates and weights against your official university records. Seed dates are fictional and explicitly marked as demo data.
+
+## Tailscale Serve compatibility audit
+
+The existing application runtime needed no changes for the documented production-mode Serve path. `tests/reverse-proxy.test.ts` exercises the actual API handlers against a disposable SQLite database with localhost, LAN and two fictional HTTPS tailnet hostnames. The backend request URL stays HTTP, with the original external Host preserved, matching Serve's HTTP proxy implementation.
+
+- Login, host-only HttpOnly/SameSite=Strict cookies, Secure on HTTPS and ordinary cookies on local HTTP, session lookup, logout invalidation and subsequent login are checked.
+- All mutation handlers reject missing or mismatched Origin/Host, cross-site requests and non-JSON content types. Forwarded headers cannot rescue mismatches or change cookie security; Tailscale identity alone cannot authenticate.
+- Authenticated task creation/deletion, shared database reads, JSON export/restore and CSV downloads work through each simulated address. Password hashes and session tokens are absent from portable exports.
+- Static inspection: navigation/API/download paths, manifest scope/start URL and service-worker registration are relative to the current origin. No application redirects to localhost or a LAN address were found. The service worker skips private API requests. Setup terminal text and Settings LAN help contain instructional local addresses only.
+- Host validation is the existing Origin-host-and-port comparison, not a configured hostname allowlist. Forwarded headers are not used by application authentication or write protection. No wildcard origins, proxy trust setting, Tailscale identity authentication or automatic HTTPS redirects were introduced.
+- The separate Next.js development-origin restriction remains unchanged. The README uses `npm run build` and `npm run start` for Tailscale access.
+- `.env` variants, root `data/`, `backups/` and SQLite files remain ignored. Tracked files and repository history were checked for those private paths; only the non-secret `.env.example` is tracked. Password hashes and sessions reside in the ignored SQLite database, and the setup token resides in ignored `data/setup-token`.
+
+These are automated handler tests and source inspection, not physical Tailscale, TLS/browser-cookie, iPhone/iPad or QUT network tests. The user has separately reported successful Windows localhost and phone-on-LAN access. Device and remote-network checks remain for the user.
