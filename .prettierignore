@@ -1,0 +1,8 @@
+node_modules
+.next
+.qa
+app/qa-check
+/data
+/backups
+package-lock.json
+prisma/migrations

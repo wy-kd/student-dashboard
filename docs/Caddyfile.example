@@ -1,0 +1,10 @@
+{
+    auto_https disable_redirects
+}
+
+# Replace this example private IP with the Windows laptop's Wi-Fi IPv4 address.
+https://192.168.1.42:3443 {
+    bind 192.168.1.42
+    tls internal
+    reverse_proxy 127.0.0.1:3000
+}
