@@ -1,0 +1,40 @@
+{
+  "name": "student-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/setup.mjs --install",
+    "predev": "node scripts/setup.mjs",
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "prestart": "node scripts/setup.mjs",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:backup": "tsx scripts/backup.ts",
+    "password:reset": "tsx scripts/reset-password.ts"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "@prisma/client": "6.19.0",
+    "prisma": "6.19.0",
+    "zod": "4.1.12",
+    "lucide-react": "0.468.0",
+    "tsx": "4.20.6"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.19.0",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "tailwindcss": "4.1.16",
+    "@tailwindcss/postcss": "4.1.16"
+  },
+  "type": "module"
+}

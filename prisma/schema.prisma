@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default("owner")
+  passwordHash String
+  failedAttempts Int @default(0)
+  lockedUntil Float @default(0)
+  sessions Session[]
+}
+model Session {
+  id String @id
+  expiresAt Float
+  userId String
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+}
+model Setting {
+  id String @id @default("settings")
+  timezone String @default("Australia/Brisbane")
+  dailyHours Float @default(3)
+  name String @default("Darrel")
+  activeSemesterId String?
+}
+model Semester {
+  id String @id @default(cuid())
+  name String
+  startDate String
+  endDate String
+  teachingStart String
+  teachingWeeks Int @default(13)
+  examStart String?
+  examEnd String?
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  subjects Subject[]
+  dates ImportantDate[]
+}
+model Subject {
+  id String @id @default(cuid())
+  code String
+  name String
+  semesterId String
+  semester Semester @relation(fields:[semesterId], references:[id], onDelete:Restrict)
+  lecturer String @default("")
+  tutor String @default("")
+  color String @default("#4f46e5")
+  notes String @default("")
+  links String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  assignments Assignment[]
+  exams Exam[]
+  tasks Task[]
+  classes Class[]
+  sessions StudySession[]
+  content WeeklyContent[]
+  @@unique([code, semesterId])
+  @@index([semesterId])
+}
+model Assignment {
+  id String @id @default(cuid())
+  name String
+  subjectId String
+  subject Subject @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  description String @default("")
+  weighting Float @default(0)
+  releaseDate String?
+  dueAt String
+  estimatedHours Float @default(10)
+  actualHours Float @default(0)
+  progress Float @default(0)
+  priority String @default("Medium")
+  difficulty Int @default(3)
+  status String @default("Not Started")
+  notes String @default("")
+  links String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  tasks Task[]
+  milestones Milestone[]
+  sessions StudySession[]
+  grade Grade?
+  @@index([subjectId])
+  @@index([dueAt])
+}
+model Task {
+  id String @id @default(cuid())
+  name String
+  subjectId String?
+  subject Subject? @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  assignmentId String?
+  assignment Assignment? @relation(fields:[assignmentId], references:[id], onDelete:Restrict)
+  examId String?
+  exam Exam? @relation(fields:[examId], references:[id], onDelete:Restrict)
+  dueAt String?
+  status String @default("Not Started")
+  priority String @default("Medium")
+  estimatedHours Float @default(1)
+  actualHours Float @default(0)
+  notes String @default("")
+  completedAt String?
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([assignmentId])
+  @@index([examId])
+  @@index([subjectId])
+  @@index([dueAt])
+}
+model Milestone {
+  id String @id @default(cuid())
+  name String
+  assignmentId String
+  assignment Assignment @relation(fields:[assignmentId], references:[id], onDelete:Restrict)
+  dueAt String
+  done Boolean @default(false)
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([assignmentId])
+}
+model Exam {
+  id String @id @default(cuid())
+  name String
+  subjectId String
+  subject Subject @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  dueAt String
+  duration Int @default(120)
+  location String @default("")
+  weighting Float @default(40)
+  progress Float @default(0)
+  confidence Int @default(3)
+  estimatedHours Float @default(20)
+  completed Boolean @default(false)
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  topics ExamTopic[]
+  tasks Task[]
+  sessions StudySession[]
+  grade Grade?
+  @@index([subjectId])
+  @@index([dueAt])
+}
+model ExamTopic {
+  id String @id @default(cuid())
+  name String
+  examId String
+  exam Exam @relation(fields:[examId], references:[id], onDelete:Restrict)
+  status String @default("Not Started")
+  kind String @default("Topic")
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([examId])
+}
+model Class {
+  id String @id @default(cuid())
+  subjectId String
+  subject Subject @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  name String
+  day Int
+  startTime String
+  endTime String
+  startDate String
+  endDate String
+  kind String @default("Lecture")
+  location String @default("")
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([subjectId])
+}
+model StudySession {
+  id String @id @default(cuid())
+  name String
+  subjectId String?
+  subject Subject? @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  assignmentId String?
+  assignment Assignment? @relation(fields:[assignmentId], references:[id], onDelete:Restrict)
+  examId String?
+  exam Exam? @relation(fields:[examId], references:[id], onDelete:Restrict)
+  dueAt String
+  plannedHours Float @default(1)
+  actualHours Float @default(0)
+  completed Boolean @default(false)
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([subjectId])
+  @@index([assignmentId])
+  @@index([examId])
+  @@index([dueAt])
+}
+model Grade {
+  id String @id @default(cuid())
+  assignmentId String? @unique
+  assignment Assignment? @relation(fields:[assignmentId], references:[id], onDelete:Restrict)
+  examId String? @unique
+  exam Exam? @relation(fields:[examId], references:[id], onDelete:Restrict)
+  score Float
+  maximum Float @default(100)
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+}
+model ImportantDate {
+  id String @id @default(cuid())
+  name String
+  semesterId String?
+  semester Semester? @relation(fields:[semesterId], references:[id], onDelete:Restrict)
+  dueAt String
+  endDate String?
+  kind String @default("Academic")
+  notes String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([semesterId])
+}
+model WeeklyContent {
+  id String @id @default(cuid())
+  subjectId String
+  subject Subject @relation(fields:[subjectId], references:[id], onDelete:Restrict)
+  name String
+  week Int
+  completed Boolean @default(false)
+  notes String @default("")
+  links String @default("")
+  revision Int @default(0)
+  demo Boolean @default(false)
+  @@index([subjectId])
+}
