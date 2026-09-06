@@ -1,0 +1,2 @@
+import {NextRequest,NextResponse} from 'next/server';import {requireAuth,sameOrigin,jsonBody,errorResponse} from '@/lib/auth';import {seedDemo,clearDemo} from '@/lib/seed';
+export const runtime='nodejs';export async function POST(req:NextRequest){try{sameOrigin(req);await requireAuth(req);const b=await jsonBody(req);if(b.action==='clear')return NextResponse.json(await clearDemo());await seedDemo();return NextResponse.json({ok:true});}catch(e){return errorResponse(e)}}

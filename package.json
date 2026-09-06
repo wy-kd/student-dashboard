@@ -8,15 +8,15 @@
   "scripts": {
     "postinstall": "node scripts/setup.mjs --install",
     "predev": "node scripts/setup.mjs",
-    "dev": "next dev --hostname 0.0.0.0",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "prestart": "node scripts/setup.mjs",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
-    "db:seed": "tsx scripts/seed.ts",
-    "db:backup": "tsx scripts/backup.ts",
-    "password:reset": "tsx scripts/reset-password.ts"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:seed": "node --import tsx scripts/seed.ts",
+    "db:backup": "node --import tsx scripts/backup.ts",
+    "password:reset": "node --import tsx scripts/reset-password.ts"
   },
   "dependencies": {
     "next": "16.3.4",
