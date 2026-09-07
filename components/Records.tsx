@@ -295,7 +295,7 @@ export function SimpleRows({ entity, rows }: { entity: Entity; rows: RecordRow[]
                   ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][r.day]} · ${r.startTime}–${r.endTime} · ${r.location}`
                   : ''}
                 {entity === 'studySession'
-                  ? ` · planned ${r.plannedHours}h · actual ${r.actualHours}h`
+                  ? ` · planned ${Math.round(r.plannedHours * 60)}m · actual ${Math.round(r.actualHours * 60)}m`
                   : ''}
               </span>
               {r.kind && <Badge>{r.kind}</Badge>}
