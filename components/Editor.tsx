@@ -135,30 +135,15 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
   const essentials = fields[entity].filter(
     (f) =>
       f.required ||
-      [
-        'dueAt',
-        'estimatedHours',
-        'status',
-        'priority',
-        'weighting',
-        'score',
-        'maximum',
-        'plannedHours',
-        'day',
-        'startTime',
-        'endTime',
-        'assignmentId',
-        'examId',
-        'subjectId',
-        'done',
-        'completed',
-      ].includes(f.key),
+      ['dueAt', 'weighting', 'score', 'maximum', 'plannedHours'].includes(f.key) ||
+      (entity === 'grade' && ['assignmentId', 'examId'].includes(f.key)),
   );
   const extra = fields[entity].filter((f) => !essentials.includes(f));
   return (
     <dialog
       ref={dialog}
       className="editor"
+      aria-label={(row ? 'Edit ' : 'New ') + labels[entity]}
       onCancel={(e) => {
         if (busy) e.preventDefault();
         else close();

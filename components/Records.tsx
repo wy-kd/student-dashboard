@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { RecurringTasks } from './RecurringTasks';
 import { Plus, ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { useApp, titleFor } from './context';
 import {
@@ -114,14 +115,16 @@ export function Tasks() {
   return (
     <>
       <Heading title="Tasks" sub="Turn bigger goals into the next small step." entity="task" />
+      <RecurringTasks />
       <div className="toolbar">
-        <div className="tabs">
-          {options.map((o) => (
-            <button key={o} className={o === filter ? 'active' : ''} onClick={() => setFilter(o)}>
-              {o}
-            </button>
-          ))}
-        </div>
+        <label>
+          Show{' '}
+          <select aria-label="Task view" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            {options.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        </label>
         <input
           aria-label="Filter tasks"
           placeholder="Filter tasks…"
@@ -472,36 +475,39 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
         </Section>
       )}
       {!isSubject && !exam && (
-        <Section
-          title="Assignment timeline"
-          action={
-            <button
-              className="text-button"
-              onClick={() => open({ entity: 'milestone', prefill: { assignmentId: id } })}
-            >
-              <Plus size={16} />
-              Add milestone
-            </button>
-          }
-        >
-          <div className="timeline">
-            {d.milestone
-              .filter((m) => m.assignmentId === id)
-              .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
-              .map((m) => (
-                <div key={m.id} className={'timeline-event ' + (m.done ? 'done' : '')}>
-                  <div className="timeline-date">{m.dueAt.slice(0, 10)}</div>
-                  <SimpleRows entity="milestone" rows={[m]} />
-                  {!m.done && m.dueAt < now && <Badge>Missed</Badge>}
-                </div>
-              ))}
-            <div className="timeline-event">
-              <div className="timeline-date">{r.dueAt.slice(0, 10)}</div>
-              <strong>Submission · {r.dueAt.slice(11)}</strong>
-              <Badge>{r.status}</Badge>
+        <details className="more-fields">
+          <summary>Timeline & milestones</summary>
+          <Section
+            title="Assignment timeline"
+            action={
+              <button
+                className="text-button"
+                onClick={() => open({ entity: 'milestone', prefill: { assignmentId: id } })}
+              >
+                <Plus size={16} />
+                Add milestone
+              </button>
+            }
+          >
+            <div className="timeline">
+              {d.milestone
+                .filter((m) => m.assignmentId === id)
+                .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+                .map((m) => (
+                  <div key={m.id} className={'timeline-event ' + (m.done ? 'done' : '')}>
+                    <div className="timeline-date">{m.dueAt.slice(0, 10)}</div>
+                    <SimpleRows entity="milestone" rows={[m]} />
+                    {!m.done && m.dueAt < now && <Badge>Missed</Badge>}
+                  </div>
+                ))}
+              <div className="timeline-event">
+                <div className="timeline-date">{r.dueAt.slice(0, 10)}</div>
+                <strong>Submission · {r.dueAt.slice(11)}</strong>
+                <Badge>{r.status}</Badge>
+              </div>
             </div>
-          </div>
-        </Section>
+          </Section>
+        </details>
       )}
       <Section
         title={exam ? 'Revision tasks' : 'Tasks'}

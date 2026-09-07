@@ -1,3 +1,9 @@
+import {
+  exportProductivity,
+  parseProductivity,
+  clearProductivity,
+  restoreProductivity,
+} from './productivity-backup';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { db } from './db';
 import { snapshot, cleanInput, validateRelations, AppError } from './service';
@@ -20,9 +26,10 @@ export const exportOrder: Entity[] = [
 export async function exportBackup() {
   return db.$transaction(async (tx) => ({
     format: 'student-dashboard',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     data: await snapshot(tx),
+    productivity: await exportProductivity(tx),
   }));
 }
 export async function saveBackup() {
@@ -33,8 +40,9 @@ export async function saveBackup() {
   return path;
 }
 export async function restoreBackup(input: any) {
-  if (input?.format !== 'student-dashboard' || input.version !== 1 || !input.data)
+  if (input?.format !== 'student-dashboard' || ![1, 2].includes(input.version) || !input.data)
     throw new AppError('This is not a supported Student Dashboard backup.');
+  const extra = input.version === 2 ? parseProductivity(input.productivity) : null;
   const data = input.data;
   const parsed: any = {};
   let count = 0;
@@ -48,6 +56,12 @@ export async function restoreBackup(input: any) {
         throw new AppError(`Invalid or duplicate ${e} ID.`);
       ids.add(r.id);
       const row: any = schemaFor(e).parse(cleanInput(e, r));
+      if (e === 'assignment') {
+        const v = r.submittedAt;
+        if (v != null && (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)))
+          throw new AppError('Invalid submission date.');
+        row.submittedAt = v ?? null;
+      }
       if (e === 'task') {
         const v = r.completedAt;
         if (v != null && (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)))
@@ -83,12 +97,14 @@ export async function restoreBackup(input: any) {
           const previous = current[e].find((r) => r.id === row.id);
           if (previous) row.revision = Math.max(row.revision, previous.revision + 1);
         }
+      await clearProductivity(tx);
       for (const e of [...exportOrder].reverse()) await c[e].deleteMany();
       for (const e of exportOrder)
         for (const row of parsed[e]) {
           await validateRelations(c, e, row);
           await c[e].create({ data: row });
         }
+      await restoreProductivity(tx, extra);
       await tx.setting.upsert({
         where: { id: 'settings' },
         create: { id: 'settings', ...setting },

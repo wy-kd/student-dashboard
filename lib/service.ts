@@ -51,9 +51,16 @@ export async function validateRelations(client: any, entity: Entity, row: any, i
     if (id) {
       const children = await client.task.findMany({ where: { [entity + 'Id']: id } });
       const sessions = await client.studySession.findMany({ where: { [entity + 'Id']: id } });
-      if ([...children, ...sessions].some((x) => x.subjectId && x.subjectId !== row.subjectId))
+      const timers = await client.studyTimer.findMany({
+        where: { [entity + 'Id']: id, activeKey: { not: null } },
+      });
+      if (
+        [...children, ...sessions, ...timers].some(
+          (x) => x.subjectId && x.subjectId !== row.subjectId,
+        )
+      )
         throw new AppError(
-          'Unlink related tasks and study sessions before changing this assessment’s subject.',
+          'Finish or cancel linked timers, and unlink related tasks and study sessions before changing this assessment’s subject.',
         );
     }
   }
@@ -80,6 +87,12 @@ export async function saveRow(entity: Entity, input: any, id?: string, revision?
         );
     }
     await validateRelations(client, entity, row, id);
+    if (entity === 'assignment') {
+      const old = id ? await tx.assignment.findUnique({ where: { id } }) : null;
+      const setting = await tx.setting.findUnique({ where: { id: 'settings' } });
+      row.submittedAt =
+        row.status === 'Submitted' ? (old?.submittedAt ?? civilNow(setting?.timezone)) : null;
+    }
     if (entity === 'task') {
       const setting = await tx.setting.findUnique({ where: { id: 'settings' } });
       const old = id ? await tx.task.findUnique({ where: { id } }) : null;

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { NotificationSettings } from './Notifications';
 import { Download, Plus, ShieldCheck } from 'lucide-react';
 import { useApp } from './context';
 import { Heading, SimpleRows } from './Records';
@@ -106,145 +107,149 @@ export function Settings() {
           </button>
         </form>
       </Section>
-      <Section
-        title="Semesters"
-        action={
-          <button className="text-button" onClick={() => open({ entity: 'semester' })}>
-            <Plus size={17} />
-            Add semester
-          </button>
-        }
-      >
-        <SimpleRows entity="semester" rows={d.semester} />
-        <p className="muted">
-          Teaching weeks count from your first teaching date. Add a Break in Calendar covering a
-          whole teaching week to skip it. Use Important Dates for census dates and holidays. Demo
-          dates are illustrative.
-        </p>
-      </Section>
-      <Section
-        title="Backups & data export"
-        sub="Backups include academic records and preferences. Passwords and login sessions are excluded."
-      >
-        <div className="action-grid">
-          <div>
-            <h3>Download a portable backup</h3>
-            <p>
-              Keep a copy somewhere separate from your laptop. Anyone with this file can read its
-              academic data.
-            </p>
-            <a className="button secondary" href="/api/backup" download>
-              <Download size={17} />
-              Export JSON backup
-            </a>
+      <NotificationSettings />
+      <details className="more-fields">
+        <summary>Semesters & data maintenance</summary>
+        <Section
+          title="Semesters"
+          action={
+            <button className="text-button" onClick={() => open({ entity: 'semester' })}>
+              <Plus size={17} />
+              Add semester
+            </button>
+          }
+        >
+          <SimpleRows entity="semester" rows={d.semester} />
+          <p className="muted">
+            Teaching weeks count from your first teaching date. Add a Break in Calendar covering a
+            whole teaching week to skip it. Use Important Dates for census dates and holidays. Demo
+            dates are illustrative.
+          </p>
+        </Section>
+        <Section
+          title="Backups & data export"
+          sub="Backups include academic records and preferences. Passwords and login sessions are excluded."
+        >
+          <div className="action-grid">
+            <div>
+              <h3>Download a portable backup</h3>
+              <p>
+                Keep a copy somewhere separate from your laptop. Anyone with this file can read its
+                academic data.
+              </p>
+              <a className="button secondary" href="/api/backup" download>
+                <Download size={17} />
+                Export JSON backup
+              </a>
+            </div>
+            <div>
+              <h3>Save a backup on this laptop</h3>
+              <p>Creates a dated JSON file in the project’s backups folder.</p>
+              <button
+                className="button secondary"
+                disabled={busy}
+                onClick={() =>
+                  action(
+                    '/api/backup',
+                    { action: 'backup' },
+                    'Backup saved in the laptop’s backups folder.',
+                  )
+                }
+              >
+                Create local backup
+              </button>
+            </div>
+            <div>
+              <h3>Restore a backup</h3>
+              <p>
+                Replaces academic and productivity records. The current data is backed up
+                automatically before restoring.
+              </p>
+              <label className="button secondary file-button">
+                Choose JSON backup
+                <input
+                  aria-label="Choose JSON backup to restore"
+                  type="file"
+                  accept="application/json,.json"
+                  disabled={busy}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    if (file.size > 5_000_000) {
+                      notify('Maximum backup size is 5 MB.');
+                      return;
+                    }
+                    if (
+                      !confirm(
+                        'Replace all academic data with this backup? A copy of current data will be saved first.',
+                      )
+                    )
+                      return;
+                    try {
+                      await action(
+                        '/api/backup',
+                        JSON.parse(await file.text()),
+                        'Backup restored. Refresh any other open devices.',
+                      );
+                    } catch {
+                      notify('The selected file is not valid JSON.');
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
-          <div>
-            <h3>Save a backup on this laptop</h3>
-            <p>Creates a dated JSON file in the project’s backups folder.</p>
+          <details className="more-fields">
+            <summary>Export individual tables as CSV</summary>
+            <div className="export-links">
+              {entities.map((e) => (
+                <a className="button secondary" key={e} href={'/api/backup?csv=' + e} download>
+                  {labels[e]}
+                </a>
+              ))}
+            </div>
+          </details>
+        </Section>
+        <Section
+          title="Demo data"
+          sub="Explore with fictional university records before entering your own."
+        >
+          <div className="inline">
             <button
               className="button secondary"
               disabled={busy}
               onClick={() =>
                 action(
-                  '/api/backup',
-                  { action: 'backup' },
-                  'Backup saved in the laptop’s backups folder.',
+                  '/api/demo',
+                  { action: 'seed' },
+                  'Demo data added. Select Semester 2 · Demo in the top bar.',
                 )
               }
             >
-              Create local backup
+              Add demo data
+            </button>
+            <button
+              className="button danger-button"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  confirm(
+                    'Remove untouched demo records? Edited records and demo parents linked to your records will be kept. A backup is created first.',
+                  )
+                )
+                  action('/api/demo', { action: 'clear' }, 'Demo data removed.');
+              }}
+            >
+              Remove demo data
             </button>
           </div>
-          <div>
-            <h3>Restore a backup</h3>
-            <p>
-              Replaces all academic records. The current data is backed up automatically before
-              restoring.
-            </p>
-            <label className="button secondary file-button">
-              Choose JSON backup
-              <input
-                aria-label="Choose JSON backup to restore"
-                type="file"
-                accept="application/json,.json"
-                disabled={busy}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!file) return;
-                  if (file.size > 5_000_000) {
-                    notify('Maximum backup size is 5 MB.');
-                    return;
-                  }
-                  if (
-                    !confirm(
-                      'Replace all academic data with this backup? A copy of current data will be saved first.',
-                    )
-                  )
-                    return;
-                  try {
-                    await action(
-                      '/api/backup',
-                      JSON.parse(await file.text()),
-                      'Backup restored. Refresh any other open devices.',
-                    );
-                  } catch {
-                    notify('The selected file is not valid JSON.');
-                  }
-                }}
-              />
-            </label>
-          </div>
-        </div>
-        <details className="more-fields">
-          <summary>Export individual tables as CSV</summary>
-          <div className="export-links">
-            {entities.map((e) => (
-              <a className="button secondary" key={e} href={'/api/backup?csv=' + e} download>
-                {labels[e]}
-              </a>
-            ))}
-          </div>
-        </details>
-      </Section>
-      <Section
-        title="Demo data"
-        sub="Explore with fictional university records before entering your own."
-      >
-        <div className="inline">
-          <button
-            className="button secondary"
-            disabled={busy}
-            onClick={() =>
-              action(
-                '/api/demo',
-                { action: 'seed' },
-                'Demo data added. Select Semester 2 · Demo in the top bar.',
-              )
-            }
-          >
-            Add demo data
-          </button>
-          <button
-            className="button danger-button"
-            disabled={busy}
-            onClick={() => {
-              if (
-                confirm(
-                  'Remove untouched demo records? Edited records and demo parents linked to your records will be kept. A backup is created first.',
-                )
-              )
-                action('/api/demo', { action: 'clear' }, 'Demo data removed.');
-            }}
-          >
-            Remove demo data
-          </button>
-        </div>
-        <p className="muted">
-          Editing a demo record makes it yours. Removing demo data preserves edited records and any
-          parents they need.
-        </p>
-      </Section>
+          <p className="muted">
+            Editing a demo record makes it yours. Removing demo data preserves edited records and
+            any parents they need.
+          </p>
+        </Section>
+      </details>
       <Section title="Access from your devices">
         <p>
           Your laptop runs the app and stores the database. Keep it awake, then open{' '}
@@ -252,8 +257,8 @@ export function Settings() {
         </p>
         <p>
           Full PWA installation and offline features require HTTPS on your phone or iPad. Plain HTTP
-          over Wi-Fi supports the app itself. The README includes Windows Firewall and optional
-          local HTTPS instructions.
+          over Wi-Fi supports the app itself. Use your private Tailscale HTTPS address for remote
+          access. The README includes setup instructions.
         </p>
         <p className="muted">
           Sign-in uses a single password. If you forget it, stop the server and run{' '}

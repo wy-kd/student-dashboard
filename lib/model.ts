@@ -15,6 +15,7 @@ export const entities = [
 ] as const;
 export type Entity = (typeof entities)[number];
 export type Data = { [K in Entity]: RecordRow[] } & {
+  productivity?: any;
   setting: { name: string; timezone: string; dailyHours: number; activeSemesterId: string | null };
 };
 export type Field = {

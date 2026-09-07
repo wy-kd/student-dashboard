@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { StudyTimer } from './StudyTimer';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useApp } from './context';
 import { Heading, SimpleRows } from './Records';
@@ -195,48 +196,54 @@ export function Study() {
         sub="Make time for focused work, then record the time you actually spent."
         entity="studySession"
       />
-      <div className="tabs">
-        {['Day', 'Week', 'Month'].map((p) => (
-          <button key={p} className={p === period ? 'active' : ''} onClick={() => setPeriod(p)}>
-            {p}
-          </button>
-        ))}
-      </div>
-      <div className="metrics">
-        <div>
-          <span>Actual hours this {period.toLowerCase()}</span>
-          <strong>{round(actual)}h</strong>
-          <small>Recorded against session dates</small>
-        </div>
-        <div>
-          <span>Planned hours to now</span>
-          <strong>{round(planned)}h</strong>
-          <small>Plans up to the current time</small>
-        </div>
-        <div>
-          <span>Sessions completed</span>
-          <strong>{rows.filter((r) => r.completed).length}</strong>
-          <small>This {period.toLowerCase()}</small>
-        </div>
-      </div>
-      <Section title="Hours by subject">
-        <div className="distribution">
-          {bySubject.map((s) => (
-            <div key={s.id}>
-              <SubjectTag id={s.id} />
-              <div className="bar">
-                <i
-                  style={{
-                    width: `${actual ? (s.hours / actual) * 100 : 0}%`,
-                    background: s.color,
-                  }}
-                />
-              </div>
-              <strong>{round(s.hours)}h</strong>
-            </div>
+      <Section title="Study timer">
+        <StudyTimer />
+      </Section>
+      <details className="more-fields">
+        <summary>Study history & hours</summary>
+        <div className="tabs">
+          {['Day', 'Week', 'Month'].map((p) => (
+            <button key={p} className={p === period ? 'active' : ''} onClick={() => setPeriod(p)}>
+              {p}
+            </button>
           ))}
         </div>
-      </Section>
+        <div className="metrics">
+          <div>
+            <span>Actual hours this {period.toLowerCase()}</span>
+            <strong>{round(actual)}h</strong>
+            <small>Recorded against session dates</small>
+          </div>
+          <div>
+            <span>Planned hours to now</span>
+            <strong>{round(planned)}h</strong>
+            <small>Plans up to the current time</small>
+          </div>
+          <div>
+            <span>Sessions completed</span>
+            <strong>{rows.filter((r) => r.completed).length}</strong>
+            <small>This {period.toLowerCase()}</small>
+          </div>
+        </div>
+        <Section title="Hours by subject">
+          <div className="distribution">
+            {bySubject.map((s) => (
+              <div key={s.id}>
+                <SubjectTag id={s.id} />
+                <div className="bar">
+                  <i
+                    style={{
+                      width: `${actual ? (s.hours / actual) * 100 : 0}%`,
+                      background: s.color,
+                    }}
+                  />
+                </div>
+                <strong>{round(s.hours)}h</strong>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </details>
       <Section title="Planned & completed sessions">
         <SimpleRows
           entity="studySession"
@@ -256,26 +263,30 @@ export function Grades() {
         sub="See what you have earned, and what you need next."
         entity="grade"
       />
-      <Section
-        title="Target grade calculator"
-        sub="Required average across all remaining subject weighting."
-      >
-        <label className="target-input">
-          Target overall percentage
-          <input
-            aria-label="Target overall percentage"
-            type="number"
-            min={0}
-            max={100}
-            value={target}
-            onChange={(e) => setTarget(Math.min(100, Math.max(0, Number(e.target.value))))}
-          />
-        </label>
-        <p className="muted">
-          Current grade averages only marked assessments. Earned contribution is percentage points
-          towards your final subject result. Unrecorded assessment weights still count as remaining.
-        </p>
-      </Section>
+      <details className="more-fields">
+        <summary>Calculate a target grade</summary>
+        <Section
+          title="Target grade calculator"
+          sub="Required average across all remaining subject weighting."
+        >
+          <label className="target-input">
+            Target overall percentage
+            <input
+              aria-label="Target overall percentage"
+              type="number"
+              min={0}
+              max={100}
+              value={target}
+              onChange={(e) => setTarget(Math.min(100, Math.max(0, Number(e.target.value))))}
+            />
+          </label>
+          <p className="muted">
+            Current grade averages only marked assessments. Earned contribution is percentage points
+            towards your final subject result. Unrecorded assessment weights still count as
+            remaining.
+          </p>
+        </Section>
+      </details>
       {d.subject.map((s) => {
         const g = gradeSummary(s.id, d, target);
         return (

@@ -204,6 +204,16 @@ export async function clearDemo() {
     const rows = await c[e].findMany({ where: { demo: true } });
     for (const r of rows)
       try {
+        if (['subject', 'assignment', 'exam', 'task'].includes(e)) {
+          const timerLinks = await db.studyTimer.count({ where: { [e + 'Id']: r.id } });
+          const recurrenceLinks = ['subject', 'assignment'].includes(e)
+            ? await db.recurrence.count({ where: { [e + 'Id']: r.id } })
+            : 0;
+          if (timerLinks || recurrenceLinks) {
+            retained++;
+            continue;
+          }
+        }
         await c[e].delete({ where: { id: r.id } });
         removed++;
       } catch (error: any) {

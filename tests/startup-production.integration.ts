@@ -1,5 +1,6 @@
 // Run after npm run build. Never starts the app against the developer's database.
 import test from 'node:test';
+import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import {
   mkdtempSync,
@@ -58,7 +59,19 @@ test(
     seed.exec(`INSERT INTO User (id,passwordHash) VALUES ('owner','fixture-password-hash-SECRET');
     INSERT INTO Session (id,expiresAt,userId) VALUES ('fixture-session-SECRET',9999999999999,'owner');
     INSERT INTO Task (id,name) VALUES ('preserve-task','Existing academic record');`);
+    const token = 'fixture-production-token-SECRET';
+    seed
+      .prepare('INSERT INTO Session (id,expiresAt,userId) VALUES (?,9999999999999,?)')
+      .run(createHash('sha256').update(token).digest('hex'), 'owner');
+    seed.prepare('UPDATE Task SET dueAt=? WHERE id=?').run('2026-01-01T10:00', 'preserve-task');
     seed.close();
+    const headers = {
+      host: '127.0.0.1:3000',
+      origin: 'http://127.0.0.1:3000',
+      'content-type': 'application/json',
+      cookie: 'student_session=' + token,
+    };
+    const timerId = randomUUID();
     let active: ReturnType<typeof launch> | undefined;
     try {
       for (let cycle = 0; cycle < 2; cycle++) {
@@ -73,6 +86,47 @@ test(
         });
         assert.equal((await fetch('http://127.0.0.1:3000/api/data')).status, 401);
         assert.equal((await command(root, 'start')).code, 1, 'duplicate start refused');
+        // Real production API and startup instrumentation, not a fake server.
+        let productivity: any;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const response = await fetch('http://127.0.0.1:3000/api/productivity', { headers });
+          assert.equal(response.status, 200);
+          productivity = await response.json();
+          if (productivity.notifications.length) break;
+          await new Promise((done) => setTimeout(done, 100));
+        }
+        assert.ok(
+          productivity.notifications.length,
+          'server scheduler creates persisted reminders without a browser',
+        );
+        if (cycle === 0) {
+          let response = await fetch('http://127.0.0.1:3000/api/productivity', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              action: 'timer.start',
+              timer: {
+                requestId: timerId,
+                name: 'Production fixture study',
+                mode: 'stopwatch',
+                focusMinutes: 50,
+                breakMinutes: 10,
+                rounds: 1,
+              },
+            }),
+          });
+          assert.equal(response.status, 200);
+          response = await fetch('http://127.0.0.1:3000/api/productivity', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ action: 'timer.pause', id: timerId, revision: 0 }),
+          });
+          assert.equal(response.status, 200);
+        } else {
+          assert.equal(productivity.timer.id, timerId);
+          assert.equal(productivity.timer.status, 'paused');
+        }
+
         const stop = await command(root, 'stop');
         assert.equal(stop.code, 0, stop.output);
         assert.equal(await active.exited, 143, 'Next production shutdown completes');
@@ -86,7 +140,10 @@ test(
         saved.prepare('SELECT passwordHash FROM User').get()!.passwordHash,
         'fixture-password-hash-SECRET',
       );
-      assert.equal(saved.prepare('SELECT id FROM Session').get()!.id, 'fixture-session-SECRET');
+      assert.equal(
+        saved.prepare("SELECT id FROM Session WHERE id='fixture-session-SECRET'").get()!.id,
+        'fixture-session-SECRET',
+      );
       assert.equal(saved.prepare('PRAGMA integrity_check').get()!.integrity_check, 'ok');
       assert.equal(saved.prepare('SELECT count(*) AS n FROM Task').get()!.n, 1, 'no demo seeding');
       saved.close();

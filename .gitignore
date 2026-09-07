@@ -12,3 +12,7 @@ node_modules/
 *.tsbuildinfo
 next-env.d.ts
 coverage/
+# Local Web Push key files and generated fictional visual-test assets.
+vapid*.json
+/public/v2-fixture.*
+/public/v2-sizes.html

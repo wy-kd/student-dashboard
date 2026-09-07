@@ -6,6 +6,15 @@ datasource db {
   url = env("DATABASE_URL")
 }
 model User {
+  preference Preference?
+  timers StudyTimer[]
+  inbox InboxItem[]
+  recurrences Recurrence[]
+  rules ReminderRule[]
+  reminders Reminder[]
+  notifications Notification[]
+  subscriptions PushSubscription[]
+
   id String @id @default("owner")
   passwordHash String
   failedAttempts Int @default(0)
@@ -41,6 +50,9 @@ model Semester {
   dates ImportantDate[]
 }
 model Subject {
+  timers StudyTimer[]
+  recurrences Recurrence[]
+
   id String @id @default(cuid())
   code String
   name String
@@ -63,6 +75,11 @@ model Subject {
   @@index([semesterId])
 }
 model Assignment {
+  submittedAt String?
+  timers StudyTimer[]
+  recurrences Recurrence[]
+  reminders Reminder[]
+
   id String @id @default(cuid())
   name String
   subjectId String
@@ -89,6 +106,10 @@ model Assignment {
   @@index([dueAt])
 }
 model Task {
+  timers StudyTimer[]
+  occurrence TaskOccurrence?
+  reminders Reminder[]
+
   id String @id @default(cuid())
   name String
   subjectId String?
@@ -123,6 +144,9 @@ model Milestone {
   @@index([assignmentId])
 }
 model Exam {
+  timers StudyTimer[]
+  reminders Reminder[]
+
   id String @id @default(cuid())
   name String
   subjectId String
@@ -175,6 +199,9 @@ model Class {
   @@index([subjectId])
 }
 model StudySession {
+  timer StudyTimer?
+  reminders Reminder[]
+
   id String @id @default(cuid())
   name String
   subjectId String?
@@ -232,4 +259,157 @@ model WeeklyContent {
   revision Int @default(0)
   demo Boolean @default(false)
   @@index([subjectId])
+}
+
+model Preference {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revision Int @default(0)
+  layout String @default("{}")
+  density String @default("Comfortable")
+  assignmentReminders Boolean @default(true)
+  examReminders Boolean @default(true)
+  taskReminders Boolean @default(true)
+  studyReminders Boolean @default(true)
+  workloadWarnings Boolean @default(false)
+  dailySummary Boolean @default(false)
+  summaryTime String @default("08:00")
+  quietStart String @default("23:00")
+  quietEnd String @default("08:00")
+  privatePush Boolean @default(true)
+}
+model StudyTimer {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeKey String? @unique
+  revision Int @default(0)
+  name String
+  mode String
+  status String @default("running")
+  phase String @default("focus")
+  startedAt Float
+  segmentAt Float?
+  elapsedMs Float @default(0)
+  focusMs Float @default(0)
+  focusMinutes Int @default(50)
+  breakMinutes Int @default(10)
+  rounds Int @default(1)
+  round Int @default(1)
+  subjectId String?
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  assignmentId String?
+  assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  taskId String?
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  examId String?
+  exam Exam? @relation(fields: [examId], references: [id], onDelete: SetNull)
+  sessionId String? @unique
+  session StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  @@index([userId, status])
+}
+model InboxItem {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  createdAt Float
+}
+model Recurrence {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revision Int @default(0)
+  name String
+  subjectId String?
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  assignmentId String?
+  assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  priority String @default("Medium")
+  estimatedHours Float @default(1)
+  anchor String
+  nextDate String
+  time String @default("17:00")
+  intervalDays Int @default(7)
+  weekdays String @default("")
+  weekInterval Int @default(1)
+  endDate String?
+  enabled Boolean @default(true)
+  occurrences TaskOccurrence[]
+}
+model TaskOccurrence {
+  id String @id @default(cuid())
+  recurrenceId String
+  recurrence Recurrence @relation(fields: [recurrenceId], references: [id], onDelete: Cascade)
+  taskId String @unique
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date String
+  @@unique([recurrenceId, date])
+}
+model ReminderRule {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind String
+  leadMinutes Int
+  @@unique([userId, kind, leadMinutes])
+}
+model Reminder {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind String
+  assignmentId String?
+  assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  examId String?
+  exam Exam? @relation(fields: [examId], references: [id], onDelete: Cascade)
+  taskId String?
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  studySessionId String?
+  studySession StudySession? @relation(fields: [studySessionId], references: [id], onDelete: Cascade)
+  dueAt String
+  notifyAt Float
+  state String @default("pending")
+  notification Notification?
+  @@index([userId, state, notifyAt])
+}
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminderId String? @unique
+  reminder Reminder? @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  dedupeKey String @unique
+  category String
+  title String
+  message String
+  createdAt Float
+  readAt Float?
+  dismissed Boolean @default(false)
+  deliveries PushDelivery[]
+  @@index([userId, createdAt])
+}
+model PushSubscription {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint String @unique
+  p256dh String
+  auth String
+  origin String
+  name String
+  createdAt Float
+  deliveries PushDelivery[]
+}
+model PushDelivery {
+  id String @id @default(cuid())
+  notificationId String
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  attempts Int @default(0)
+  nextAttempt Float
+  deliveredAt Float?
+  @@unique([notificationId, subscriptionId])
+  @@index([deliveredAt, nextAttempt])
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -10,7 +10,10 @@ import { defaults } from '../lib/model';
 const dir = mkdtempSync(join(tmpdir(), 'student-proxy-test-'));
 process.env.DATABASE_URL = 'file:' + join(dir, 'test.db');
 const sqlite = new DatabaseSync(join(dir, 'test.db'));
-sqlite.exec(readFileSync(resolve('prisma/migrations/202609060001_initial/migration.sql'), 'utf8'));
+for (const dir of readdirSync(resolve('prisma/migrations'))
+  .filter((x) => /^\d/.test(x))
+  .sort())
+  sqlite.exec(readFileSync(resolve('prisma/migrations', dir, 'migration.sql'), 'utf8'));
 sqlite.close();
 const { db } = await import('../lib/db');
 const { hashPassword } = await import('../lib/auth');

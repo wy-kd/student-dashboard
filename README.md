@@ -1,5 +1,7 @@
 # Student Dashboard
 
+Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
+
 A personal university workspace for subjects, assessment tasks, exams, classes, study planning and grades. Next.js, React, TypeScript, Tailwind CSS, Prisma and a local SQLite database. No cloud account, AI API, subscription or hosted database is needed to use it.
 
 **The laptop is the server.** All devices connect to the same database on that laptop. Keep it awake and running. This is local self-hosting, not offline multi-device replication.
@@ -121,27 +123,27 @@ Keep these four results: the Node executable, runner script, repository director
 
 Open **Task Scheduler → Task Scheduler Library → Create Task** (not Create Basic Task). If Windows requires administrator permission to register an at-startup task, open Task Scheduler as administrator, but select **your own existing Windows account** as the task's run-as account.
 
-| Tab / field | Exact setting |
-| --- | --- |
-| General: Name | `Student Dashboard` |
-| General: User | Your existing Windows account from `whoami`, with access to this repository, Node, `.env`, `data/` and `logs/`. Do not use SYSTEM. |
-| General: Security | **Run whether user is logged on or not**. Leave **Do not store password** unchecked. Windows will ask for this account's password when saving, not your Windows Hello PIN or dashboard password. Enter it only into Windows; do not put it in scripts. |
-| General: Highest privileges | **Unchecked**. The application does not need administrator privileges. |
-| General: Configure for | Windows 10 (also the available compatibility choice on Windows 11). |
-| Triggers: New | **At startup**, delay **1 minute**, Enabled. No repetition and no separate logon trigger. |
-| Actions: New | **Start a program**. |
-| Actions: Program/script | The full `node.exe` path from step 2, e.g. `C:\Program Files\nodejs\node.exe`. Use Browse or enter it in this separate executable field. |
-| Actions: Add arguments | The runner's full path **in double quotes**, followed by `start`: `"C:\Projects\student-dashboard\scripts\windows\dashboard.mjs" start` |
-| Actions: Start in | The repository directory from step 2, e.g. `C:\Projects\student-dashboard`, **without quotes**. The launcher also sets its own working directory. |
-| Conditions: Idle | Uncheck **Start the task only if the computer is idle**. |
-| Conditions: Power | Uncheck **Start the task only if the computer is on AC power** and **Stop if the computer switches to battery power**. Keep the laptop plugged in for everyday hosting. |
-| Conditions: Network | Do not require a particular network connection. The local app can start before Tailscale connects. |
-| Settings: On demand | Check **Allow task to be run on demand**. |
-| Settings: Missed start | Check **Run task as soon as possible after a scheduled start is missed**. |
-| Settings: Restart on failure | Leave **unchecked**. Diagnose failures before retrying; a deliberate Next.js shutdown returns `143`, so automatic failure retries could undo a manual stop. |
-| Settings: Time limit | Uncheck **Stop the task if it runs longer than** (the default limit is unsuitable for a persistent server). |
-| Settings: Forced stop | Uncheck **If the running task does not end when requested, force it to stop**. Use the dashboard stop command for maintenance. |
-| Settings: Existing instance | **Do not start a new instance**. The launcher's OS-owned control channel also blocks duplicate managed starts across Windows logon sessions. |
+| Tab / field                  | Exact setting                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| General: Name                | `Student Dashboard`                                                                                                                                                                                                                                    |
+| General: User                | Your existing Windows account from `whoami`, with access to this repository, Node, `.env`, `data/` and `logs/`. Do not use SYSTEM.                                                                                                                     |
+| General: Security            | **Run whether user is logged on or not**. Leave **Do not store password** unchecked. Windows will ask for this account's password when saving, not your Windows Hello PIN or dashboard password. Enter it only into Windows; do not put it in scripts. |
+| General: Highest privileges  | **Unchecked**. The application does not need administrator privileges.                                                                                                                                                                                 |
+| General: Configure for       | Windows 10 (also the available compatibility choice on Windows 11).                                                                                                                                                                                    |
+| Triggers: New                | **At startup**, delay **1 minute**, Enabled. No repetition and no separate logon trigger.                                                                                                                                                              |
+| Actions: New                 | **Start a program**.                                                                                                                                                                                                                                   |
+| Actions: Program/script      | The full `node.exe` path from step 2, e.g. `C:\Program Files\nodejs\node.exe`. Use Browse or enter it in this separate executable field.                                                                                                               |
+| Actions: Add arguments       | The runner's full path **in double quotes**, followed by `start`: `"C:\Projects\student-dashboard\scripts\windows\dashboard.mjs" start`                                                                                                                |
+| Actions: Start in            | The repository directory from step 2, e.g. `C:\Projects\student-dashboard`, **without quotes**. The launcher also sets its own working directory.                                                                                                      |
+| Conditions: Idle             | Uncheck **Start the task only if the computer is idle**.                                                                                                                                                                                               |
+| Conditions: Power            | Uncheck **Start the task only if the computer is on AC power** and **Stop if the computer switches to battery power**. Keep the laptop plugged in for everyday hosting.                                                                                |
+| Conditions: Network          | Do not require a particular network connection. The local app can start before Tailscale connects.                                                                                                                                                     |
+| Settings: On demand          | Check **Allow task to be run on demand**.                                                                                                                                                                                                              |
+| Settings: Missed start       | Check **Run task as soon as possible after a scheduled start is missed**.                                                                                                                                                                              |
+| Settings: Restart on failure | Leave **unchecked**. Diagnose failures before retrying; a deliberate Next.js shutdown returns `143`, so automatic failure retries could undo a manual stop.                                                                                            |
+| Settings: Time limit         | Uncheck **Stop the task if it runs longer than** (the default limit is unsuitable for a persistent server).                                                                                                                                            |
+| Settings: Forced stop        | Uncheck **If the running task does not end when requested, force it to stop**. Use the dashboard stop command for maintenance.                                                                                                                         |
+| Settings: Existing instance  | **Do not start a new instance**. The launcher's OS-owned control channel also blocks duplicate managed starts across Windows logon sessions.                                                                                                           |
 
 **Why At startup?** It starts before you sign in, which is required for remote access after a full restart. A one-minute delay gives Windows time to initialise, and the explicit executable and working directory remove dependence on an interactive terminal profile. **At log on** with “Run only when user is logged on” is a simpler fallback if your account cannot run a background task, but remote access then waits for you to sign in. It does not meet fully unattended boot operation. Account/batch-logon policy restrictions must be resolved in Windows, not by running the app as SYSTEM.
 
@@ -171,11 +173,11 @@ If the task fails before the launcher runs, use Task Scheduler's **History** tab
 
 ### 5. The three unattended components
 
-| Component | Responsibility after reboot |
-| --- | --- |
-| **Student Dashboard scheduled task** | Starts the built production app and local SQLite-backed API on port 3000. |
-| **Tailscale Run unattended** | Keeps the Windows host connected to your tailnet before you sign in. Enable this in the Tailscale tray menu under Preferences. |
-| **`tailscale serve --bg 3000`** | Keeps the private HTTPS proxy configuration and resumes serving when Tailscale is running. It does not start the dashboard itself. |
+| Component                            | Responsibility after reboot                                                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Student Dashboard scheduled task** | Starts the built production app and local SQLite-backed API on port 3000.                                                          |
+| **Tailscale Run unattended**         | Keeps the Windows host connected to your tailnet before you sign in. Enable this in the Tailscale tray menu under Preferences.     |
+| **`tailscale serve --bg 3000`**      | Keeps the private HTTPS proxy configuration and resumes serving when Tailscale is running. It does not start the dashboard itself. |
 
 All three are needed. Keep the laptop powered on, awake and connected to the internet. Background startup does not prevent sleep, make a closed/sleeping laptop reachable or bypass network restrictions. Remote devices still need Tailscale connected to the same tailnet. No Funnel, Caddy or new Public-network firewall rule is involved. Localhost, permitted LAN HTTP and private Tailscale HTTPS all use the same `data/student.db` and existing password authentication.
 
@@ -330,7 +332,7 @@ Included: web manifest, standalone display, 192px and 512px icons, Apple touch i
 - On an iPhone or iPad, `http://192.168.x.x:3000` is **not** a secure context. Basic app access works; full PWA/service-worker support requires trusted HTTPS. Safari may offer a home-screen bookmark, but that is not proof of full PWA support.
 - With trusted HTTPS, open the app in Safari, use **Share → Add to Home Screen** and open the new icon. Sign in again if the installed app uses a separate cookie store.
 - The service worker provides an honest offline/laptop-unavailable screen. It does **not** cache private academic responses, queue offline edits or synchronise independently stored device databases.
-- No push notification permission is requested. Alerts are in-app only.
+- Push is optional and explicitly enabled in Settings. Permission is never requested automatically; in-app reminders work without it. See the V2 guide for local key setup and device requirements.
 
 See [MDN's installability guidance](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
 
@@ -444,6 +446,7 @@ For an installation using automatic startup, use this order. Run each command se
    ```
 
    Wait for the explicit stopped/free-port confirmation. For an old manually launched server, use its original terminal's `Ctrl+C` instead. If no scheduled task exists yet, skip the `schtasks` commands.
+
 3. With the application stopped, make a full copy of `data/` and `.env` to a safe location. The full database includes password hashes and sessions, unlike portable JSON. Preserve any SQLite journal/sidecar files along with it. Do not copy a live SQLite file as your only backup.
 4. Update and validate:
 
@@ -456,6 +459,7 @@ For an installation using automatic startup, use this order. Run each command se
    ```
 
    `npm install` runs the existing install hook, including checked-in migrations, so take the backup **before** installing. Do not delete `data/`, `.env` or `backups/`, run destructive Prisma commands, force Git updates or use `git clean -fdx`. Private files are ignored by Git and are not replaced by a normal pull. If a check fails, leave the task disabled and fix the failure; do not start against a partly built update.
+
 5. Before re-enabling the task, start the updated build manually:
 
    ```bat
@@ -516,3 +520,11 @@ Project structure:
 - `public/`: PWA manifest, icons, service worker and offline page
 
 Core operation performs no external data/API calls. Package installation requires internet access. The development launcher disables Next.js telemetry; to disable it for build/start too, run `npx next telemetry disable` once locally.
+
+## Version 2 — calmer daily study
+
+V2 adds an editable responsive Dashboard, Comfortable/Compact density, a persistent countdown/stopwatch timer and Focus Mode, configurable reminders and Notification Centre, optional Web Push, Quick Capture/Inbox, recurring tasks, editable daily plans and Weekly Review. Existing authentication, local SQLite, academic calculations, PWA, LAN/Tailscale access and the Windows cold-boot launcher remain in place.
+
+**Before updating your Acer, follow the exact [V2 update and setup guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer).** It includes backup/stop/update/test/build/start commands, optional local VAPID setup, per-device notification permission steps and the physical reboot/device checklist. Do not build or install while the scheduled app is running.
+
+The scheduler lives inside Next.js and recovers persisted reminders after restart; see [notification architecture and limitations](docs/V2-GUIDE.md#reminder-scheduling-and-retention). No second process, cloud database, public hosting or Tailscale/Task Scheduler configuration change is needed. Portable backups now use version 2 and include V2 academic/productivity state; version 1 imports still work. Passwords, sessions and push secrets stay out of portable JSON exports.

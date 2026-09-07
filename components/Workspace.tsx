@@ -21,9 +21,16 @@ import {
   Moon,
   ArrowRight,
   RefreshCw,
+  Inbox as InboxIcon,
+  Bell,
+  CalendarCheck,
 } from 'lucide-react';
 import { AppContext, type Editor as EditorType } from './context';
 import { Editor } from './Editor';
+import { MiniTimer, FocusMode } from './StudyTimer';
+import { Inbox, QuickCapture } from './Inbox';
+import { NotificationCentre } from './Notifications';
+import { WeeklyReview } from './DailyPlanning';
 import { Dashboard } from './Dashboard';
 import { Tasks, Subjects, Assessments, Detail } from './Records';
 import { Calendar, Study, Grades, Analytics } from './Planning';
@@ -34,6 +41,7 @@ const navigation = [
   ['', 'Dashboard', LayoutDashboard],
   ['today', 'Today', Sun],
   ['tasks', 'Tasks', CheckSquare],
+  ['inbox', 'Inbox', InboxIcon],
   ['assignments', 'Assignments', Files],
   ['calendar', 'Calendar', CalendarDays],
   ['timetable', 'Timetable', Clock],
@@ -42,6 +50,8 @@ const navigation = [
   ['study', 'Study', Headphones],
   ['grades', 'Grades', GraduationCap],
   ['analytics', 'Analytics', BarChart3],
+  ['review', 'Weekly Review', CalendarCheck],
+  ['notifications', 'Notifications', Bell],
   ['settings', 'Settings', SettingsIcon],
 ] as const;
 function scopeData(d: Data, id: string): Data {
@@ -97,6 +107,10 @@ export function Workspace() {
       return;
     }
     if (!res.ok) throw Error(body.error);
+    const productivity = await fetch('/api/productivity', { cache: 'no-store' });
+    if (!productivity.ok)
+      throw Error('Could not load your timer and notifications. Retry connection.');
+    body.productivity = await productivity.json();
     setData(body);
     setProblem('');
   }, []);
@@ -339,6 +353,18 @@ export function Workspace() {
     case 'analytics':
       page = <Analytics />;
       break;
+    case 'inbox':
+      page = <Inbox />;
+      break;
+    case 'notifications':
+      page = <NotificationCentre />;
+      break;
+    case 'review':
+      page = <WeeklyReview />;
+      break;
+    case 'focus':
+      page = <FocusMode />;
+      break;
     case 'settings':
       page = <Settings key={allData.setting.activeSemesterId} />;
       break;
@@ -357,7 +383,10 @@ export function Workspace() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <div className="app-shell">
+      <div
+        className={'app-shell ' + (route === 'focus' ? 'focus-shell' : '')}
+        data-density={allData.productivity?.preference?.density ?? 'Comfortable'}
+      >
         {menu && (
           <button
             className="sidebar-scrim"
@@ -382,7 +411,10 @@ export function Workspace() {
                   e.preventDefault();
                   go('/' + url);
                 }}
-                className={route === url ? 'active' : ''}
+                className={
+                  (route === url ? 'active ' : '') +
+                  (['assignments', 'review', 'settings'].includes(url) ? 'nav-divider' : '')
+                }
                 aria-current={route === url ? 'page' : undefined}
               >
                 <Icon size={19} />
@@ -423,6 +455,20 @@ export function Workspace() {
         </aside>
         <div className="main-shell">
           <header className="topbar">
+            <button
+              className="icon-button notification-bell"
+              aria-label={
+                'Notifications, ' +
+                (allData.productivity?.notifications?.filter((n: any) => !n.readAt).length ?? 0) +
+                ' unread'
+              }
+              onClick={() => go('/notifications')}
+            >
+              <Bell size={20} />
+              {allData.productivity?.notifications?.some((n: any) => !n.readAt) && (
+                <span className="unread-dot" />
+              )}
+            </button>
             <button
               className="icon-button mobile-menu"
               aria-label="Open navigation"
@@ -501,7 +547,7 @@ export function Workspace() {
             </button>
             <div className="quick-add">
               <button
-                className="button primary"
+                className="button secondary"
                 aria-expanded={quick}
                 onClick={() => setQuick(!quick)}
               >
@@ -516,6 +562,8 @@ export function Workspace() {
                     onClick={() => setQuick(false)}
                   />
                   <div className="quick-menu">
+                    <QuickCapture />
+                    <strong className="quick-menu-label">Quick Add</strong>
                     {(
                       [
                         'task',
@@ -575,6 +623,42 @@ export function Workspace() {
           </main>
         </div>
       </div>
+      {route !== 'focus' && (
+        <>
+          <nav className="bottom-nav" aria-label="Mobile navigation">
+            <button
+              onClick={() => go('/today')}
+              aria-current={route === 'today' ? 'page' : undefined}
+            >
+              <Sun size={20} />
+              Today
+            </button>
+            <button
+              onClick={() => go('/tasks')}
+              aria-current={route === 'tasks' ? 'page' : undefined}
+            >
+              <CheckSquare size={20} />
+              Tasks
+            </button>
+            <button aria-label="Quick Capture and Quick Add" onClick={() => setQuick(!quick)}>
+              <Plus size={24} />
+              Add
+            </button>
+            <button
+              onClick={() => go('/calendar')}
+              aria-current={route === 'calendar' ? 'page' : undefined}
+            >
+              <CalendarDays size={20} />
+              Calendar
+            </button>
+            <button onClick={() => setMenu(!menu)} aria-expanded={menu}>
+              <Menu size={20} />
+              More
+            </button>
+          </nav>
+          <MiniTimer />
+        </>
+      )}
       {editor && (
         <Editor
           key={editor.entity + (editor.row?.id ?? 'new')}

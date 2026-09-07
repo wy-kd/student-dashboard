@@ -178,21 +178,24 @@ export function AssessmentCard({ row, exam = false }: { row: RecordRow; exam?: b
         )}
         <span>{row.weighting}% weighting</span>
       </div>
-      <p className="muted">
-        {row.dueAt.slice(0, 10)} · {row.dueAt.slice(11)}
-        {exam ? ' · ' + row.location : ''}
-      </p>
       <Progress value={value} label={exam ? 'Revision' : 'Completion'} />
-      <div className="card-bottom">
-        <Badge>
-          {exam
-            ? row.completed
-              ? 'Completed'
-              : 'Confidence ' + row.confidence + '/5'
-            : row.status}
-        </Badge>
-        {!exam && <Badge>{row.priority}</Badge>}
-      </div>
+      <details className="more-fields">
+        <summary>Details & status</summary>
+        <p className="muted">
+          {row.dueAt.slice(0, 10)} · {row.dueAt.slice(11)}
+          {exam ? ' · ' + row.location : ''}
+        </p>
+        <div className="card-bottom">
+          <Badge>
+            {exam
+              ? row.completed
+                ? 'Completed'
+                : 'Confidence ' + row.confidence + '/5'
+              : row.status}
+          </Badge>
+          {!exam && <Badge>{row.priority}</Badge>}
+        </div>
+      </details>
     </article>
   );
 }

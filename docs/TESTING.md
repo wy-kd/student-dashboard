@@ -46,7 +46,7 @@ These are component interaction/layout checks, not a claim that a physical iPhon
 
 ## Practical limits
 
-The app requires the laptop to be running. Offline editing, independent device databases, push notifications, timetable import, CSV import, single-class occurrence overrides and automatic free-slot scheduling are not implemented. None is presented as a working button. Alerts, local priority ranking and dated study planning work without external services.
+The app requires the laptop to be running. Offline editing, independent device databases, timetable/CSV import and single-class occurrence overrides remain outside scope. V2 adds optional Web Push and editable deterministic free-slot suggestions; these require no cloud database or AI service. Device delivery needs local VAPID setup and explicit permission.
 
 Forecasts and schedule-health labels are heuristics; confirm dates and weights against your official university records. Seed dates are fictional and explicitly marked as demo data.
 
@@ -84,3 +84,11 @@ The user reported that Task Scheduler reached production startup after a physica
 - The existing actual production integration test remains in Windows/Linux CI after the production build, covering repeated start/stop, duplicate prevention, authentication protection and SQLite preservation. Windows tests continue to exercise the PowerShell wrapper and paths with spaces.
 
 These are automated tests, not a claim that the cold-boot fix passed a physical Acer reboot. The user must repeat that reboot test. Task Scheduler triggers, Tailscale configuration, migrations, singleton protection and production build/start policy are unchanged.
+
+## V2 regression coverage
+
+`tests/v2.test.ts` applies V1 then the additive V2 migration to a disposable SQLite database and checks preserved password/session records, independent dashboard layouts, reset/hide/show/reorder, timer timestamps and idempotent StudySession recording, pause/restart recovery, reminder rescheduling/cancellation/snooze/quiet hours, notification state, bounded recurrence/history, Inbox conversion, editable day-plan persistence, daily summaries, private push payloads, delivery retry/deduplication, subscription removal and V1/V2 backup imports. Push transport tests use an injected sender; they do not contact real devices or vendor services.
+
+The production lifecycle integration also authenticates against a disposable production instance, verifies server-generated reminders without a browser, pauses a real API timer, gracefully restarts through the existing launcher, and verifies the persisted timer. Existing slow 25-second startup and genuine 60-second timeout tests are retained unchanged.
+
+Browser QA uses `tests/visual-fixture.tsx`, a fictional component harness without authentication bypasses or access to user data. After a build, `node scripts/visual-fixture.mjs` generates ignored test-only assets for a supervised local preview. Remove `public/v2-fixture.js`, `public/v2-fixture.css`, `public/v2-fixture.html` and `public/v2-sizes.html` when finished; they are not part of the app. This checks component layouts and local interactions; real API behaviour is covered separately by automated tests. It is not a logged-in browser end-to-end test or physical iPhone/iPad/Windows test.
