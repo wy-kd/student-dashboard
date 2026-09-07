@@ -5,6 +5,7 @@ node_modules/
 !.env.example
 /data/
 /backups/
+/logs/
 *.db
 *.db-*
 *.sqlite*

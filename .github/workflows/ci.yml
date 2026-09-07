@@ -20,3 +20,5 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+      - name: Verify production startup and graceful stop
+        run: node --import tsx --test tests/startup-production.integration.ts

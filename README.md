@@ -56,6 +56,165 @@ npm run start -- --port 3001
 
 The setup message shows the default port; use the actual port in the Next.js startup output if you change it.
 
+## Automatic Startup on Windows
+
+Use Windows Task Scheduler to run the already-built **production** app. The launcher does not build, install packages, seed data or reset SQLite. It requires an existing `.env`, non-empty `data/student.db` and `.next/BUILD_ID`, checks port 3000 before running the existing `prisma migrate deploy` startup step, then starts the same production entry point as `next start` on `0.0.0.0:3000`.
+
+Keep the repository on a local drive available before sign-in, not a network drive or an online-only cloud-sync folder. Use your existing Windows account and Node.js installation. No Windows service, PM2, NSSM, Docker, router change or Public-network firewall rule is needed.
+
+### 1. Prepare and manually test
+
+First download a JSON backup through Settings if you have records to preserve. Stop the old manually launched app using `Ctrl+C` in its original terminal. In **Command Prompt**, open your existing repository folder (replace the example path):
+
+```bat
+cd /d "C:\Projects\student-dashboard"
+git pull --ff-only
+npm install
+npm test
+npm run typecheck
+npm run build
+node scripts/windows/dashboard.mjs start
+```
+
+Run each command separately and stop if one fails. The start command stays in the foreground for the lifetime of the server. Wait for **Ready: production HTTP and database check passed**. In a second terminal in the repository:
+
+```bat
+node scripts/windows/dashboard.mjs status
+node scripts/windows/dashboard.mjs logs
+```
+
+Open `http://localhost:3000`, sign in and check your existing records. Check your existing LAN URL and private Tailscale HTTPS URL too. Trying `start` again should refuse a duplicate without rerunning migrations. To stop safely from the second terminal:
+
+```bat
+node scripts/windows/dashboard.mjs stop
+node scripts/windows/dashboard.mjs status
+```
+
+Wait for **Stopped. Port 3000 is free; maintenance can proceed.** Status returns exit code `0` only when a managed instance is ready and its HTTP/database check passes; stopped/not-ready returns `1`. Stop returns `0` when safely stopped, including when it was already stopped. If it times out, it does **not** force-kill the process: wait, check status and retry. Do not update or copy the database until stopped.
+
+A Windows PowerShell wrapper is also included, with the same four actions and an optional explicit Node path:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\windows\dashboard.ps1" -Action start -NodePath "C:\Program Files\nodejs\node.exe"
+```
+
+Replace `start` with `stop`, `status` or `logs` as needed and use your actual Node path. This execution-policy option applies only to that PowerShell process. Both entry points locate the repository from their own script path, so they work when called by absolute path from another directory. The scheduled task below calls Node directly, avoiding PowerShell execution-policy and npm/PATH dependencies.
+
+### 2. Find the exact task paths
+
+In your repository's Command Prompt, run:
+
+```bat
+node -p "process.execPath"
+node -p "require('node:path').resolve('scripts/windows/dashboard.mjs')"
+cd
+whoami
+```
+
+Keep these four results: the Node executable, runner script, repository directory and Windows account. Use the actual executable reported, not `npm.cmd`, a shell alias or a version-manager command. If you move the repository, change Node's installation path or change your Windows account password later, update the task accordingly.
+
+### 3. Create the Task Scheduler task
+
+Open **Task Scheduler → Task Scheduler Library → Create Task** (not Create Basic Task). If Windows requires administrator permission to register an at-startup task, open Task Scheduler as administrator, but select **your own existing Windows account** as the task's run-as account.
+
+| Tab / field | Exact setting |
+| --- | --- |
+| General: Name | `Student Dashboard` |
+| General: User | Your existing Windows account from `whoami`, with access to this repository, Node, `.env`, `data/` and `logs/`. Do not use SYSTEM. |
+| General: Security | **Run whether user is logged on or not**. Leave **Do not store password** unchecked. Windows will ask for this account's password when saving, not your Windows Hello PIN or dashboard password. Enter it only into Windows; do not put it in scripts. |
+| General: Highest privileges | **Unchecked**. The application does not need administrator privileges. |
+| General: Configure for | Windows 10 (also the available compatibility choice on Windows 11). |
+| Triggers: New | **At startup**, delay **1 minute**, Enabled. No repetition and no separate logon trigger. |
+| Actions: New | **Start a program**. |
+| Actions: Program/script | The full `node.exe` path from step 2, e.g. `C:\Program Files\nodejs\node.exe`. Use Browse or enter it in this separate executable field. |
+| Actions: Add arguments | The runner's full path **in double quotes**, followed by `start`: `"C:\Projects\student-dashboard\scripts\windows\dashboard.mjs" start` |
+| Actions: Start in | The repository directory from step 2, e.g. `C:\Projects\student-dashboard`, **without quotes**. The launcher also sets its own working directory. |
+| Conditions: Idle | Uncheck **Start the task only if the computer is idle**. |
+| Conditions: Power | Uncheck **Start the task only if the computer is on AC power** and **Stop if the computer switches to battery power**. Keep the laptop plugged in for everyday hosting. |
+| Conditions: Network | Do not require a particular network connection. The local app can start before Tailscale connects. |
+| Settings: On demand | Check **Allow task to be run on demand**. |
+| Settings: Missed start | Check **Run task as soon as possible after a scheduled start is missed**. |
+| Settings: Restart on failure | Leave **unchecked**. Diagnose failures before retrying; a deliberate Next.js shutdown returns `143`, so automatic failure retries could undo a manual stop. |
+| Settings: Time limit | Uncheck **Stop the task if it runs longer than** (the default limit is unsuitable for a persistent server). |
+| Settings: Forced stop | Uncheck **If the running task does not end when requested, force it to stop**. Use the dashboard stop command for maintenance. |
+| Settings: Existing instance | **Do not start a new instance**. The launcher's OS-owned control channel also blocks duplicate managed starts across Windows logon sessions. |
+
+**Why At startup?** It starts before you sign in, which is required for remote access after a full restart. A one-minute delay gives Windows time to initialise, and the explicit executable and working directory remove dependence on an interactive terminal profile. **At log on** with “Run only when user is logged on” is a simpler fallback if your account cannot run a background task, but remote access then waits for you to sign in. It does not meet fully unattended boot operation. Account/batch-logon policy restrictions must be resolved in Windows, not by running the app as SYSTEM.
+
+### 4. Run, inspect and stop the task
+
+After the manual test has stopped, right-click **Student Dashboard → Run**. It should remain **Running** while the app is up. `0x41301` means the task is currently running; it is not proof that the HTTP/database check passed. Use the status command and browser as well.
+
+From Command Prompt, the equivalent task command is:
+
+```bat
+schtasks /Run /TN "Student Dashboard"
+```
+
+From your repository:
+
+```bat
+node scripts/windows/dashboard.mjs status
+node scripts/windows/dashboard.mjs logs
+node scripts/windows/dashboard.mjs stop
+```
+
+Do **not** use Task Scheduler **End**, Task Manager, `taskkill` or `Stop-Process` for normal maintenance. The stop command authenticates to the local control channel and invokes Next.js's own graceful shutdown handler inside the process. It waits for in-flight requests; it never kills whichever process happens to own port 3000. Next.js reports graceful SIGTERM exit code **143 (`0x8F`)** in Last Run Result. That result after a requested stop is expected. Start it again using **Run** when ready.
+
+The launcher writes only timestamps, lifecycle stages, public error codes and process IDs to **`logs/startup.log`**. `logs` shows the last 80 lines; open the file in Notepad to review more. At the next start, a log over 1 MB rotates to `startup.log.1`. Raw application/framework/migration output, passwords, hashes, setup tokens, sessions and control credentials are not saved. `logs/` is ignored by Git. The temporary `data/startup-control.json` is also ignored and is not a file to share.
+
+If the task fails before the launcher runs, use Task Scheduler's **History** tab (enable All Tasks History if needed) and **Last Run Result**. Check the executable, quoted script argument, account password and folder permissions. If startup reports a missing build, rebuild while stopped. If migration fails, preserve the database and use `node node_modules/prisma/build/index.js migrate status` from the repository for diagnostics; do not use `migrate reset`, `db push --force-reset` or delete SQLite. A port-conflict message means an existing process must be identified and stopped through its own normal controls. An ordinary `npm run start` instance is not controlled by these scripts.
+
+### 5. The three unattended components
+
+| Component | Responsibility after reboot |
+| --- | --- |
+| **Student Dashboard scheduled task** | Starts the built production app and local SQLite-backed API on port 3000. |
+| **Tailscale Run unattended** | Keeps the Windows host connected to your tailnet before you sign in. Enable this in the Tailscale tray menu under Preferences. |
+| **`tailscale serve --bg 3000`** | Keeps the private HTTPS proxy configuration and resumes serving when Tailscale is running. It does not start the dashboard itself. |
+
+All three are needed. Keep the laptop powered on, awake and connected to the internet. Background startup does not prevent sleep, make a closed/sleeping laptop reachable or bypass network restrictions. Remote devices still need Tailscale connected to the same tailnet. No Funnel, Caddy or new Public-network firewall rule is involved. Localhost, permitted LAN HTTP and private Tailscale HTTPS all use the same `data/student.db` and existing password authentication.
+
+### 6. Full reboot test
+
+1. Confirm **Student Dashboard** is enabled, Tailscale **Run unattended** is enabled and `tailscale serve status` shows the existing private proxy to `http://127.0.0.1:3000`.
+2. Restart Windows using **Restart**, leave it at the sign-in screen and wait about two minutes.
+3. On your phone, turn Wi-Fi off, keep Tailscale connected and open your existing HTTPS `.ts.net` URL. Sign in and verify existing records. This checks startup before Windows sign-in.
+4. Sign in to Windows. In the repository, run `node scripts/windows/dashboard.mjs status` and `node scripts/windows/dashboard.mjs logs`. Confirm the startup timestamp and ready message, then check `http://localhost:3000` and the LAN URL.
+5. Create a small test task, restart again and verify it remains. Check that attempting another managed start refuses a duplicate.
+
+The user has already confirmed physical Tailscale access from a phone on mobile data. **Task Scheduler registration, pre-sign-in Windows startup and a real Acer reboot have not been physically tested by this repository update.** Automated tests exercise the lifecycle and production server separately.
+
+### 7. Disable, re-enable or remove automatic startup
+
+For maintenance, disable future triggers **first**, then stop gracefully:
+
+```bat
+schtasks /Change /TN "Student Dashboard" /Disable
+node scripts/windows/dashboard.mjs stop
+node scripts/windows/dashboard.mjs status
+```
+
+Disabling a task does not stop its current process. Do not continue maintenance if stop failed or status still shows an active/occupied port. Task-management commands may require an administrator terminal depending on how the task was registered; the dashboard itself still runs without highest privileges.
+
+Re-enable and start after maintenance:
+
+```bat
+schtasks /Change /TN "Student Dashboard" /Enable
+schtasks /Run /TN "Student Dashboard"
+node scripts/windows/dashboard.mjs status
+```
+
+Wait for startup before checking status. To remove automatic startup permanently, disable the task, stop the dashboard, then run:
+
+```bat
+schtasks /Delete /TN "Student Dashboard"
+```
+
+Confirm the Windows prompt. This removes only the scheduled task. It does not uninstall the app, remove Tailscale or delete any data/backups. The GUI equivalents are right-click **Disable**, **Enable**, **Run** and **Delete**.
+
+References: [Microsoft task security](https://learn.microsoft.com/en-us/windows/win32/taskschd/security-contexts-for-running-tasks), [task settings](https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings), [Next.js graceful shutdown](https://nextjs.org/docs/app/guides/self-hosting#after) and [Tailscale Run unattended](https://tailscale.com/docs/how-to/run-unattended).
+
 ## Phone and iPad access over Wi-Fi
 
 1. Connect your laptop, phone and iPad to the **same trusted Wi-Fi**. Guest networks may deliberately block device-to-device connections.
@@ -105,7 +264,7 @@ The connection is: remote device → private tailnet → HTTPS `.ts.net` URL →
    npm run start
    ```
 
-   Keep this terminal running. Use production mode for the Tailscale path: `npm run dev` has a separate Next.js development-origin restriction and the arbitrary `.ts.net` hostname is intentionally not wildcard-allowed. Production mode still supports `http://localhost:3000` and `http://<LAN-IP>:3000` alongside Tailscale. No hostname or `.env` change is needed.
+   Keep this terminal running, or use the **Automatic Startup on Windows** scheduled task above instead of the manual server. Use production mode for the Tailscale path: `npm run dev` has a separate Next.js development-origin restriction and the arbitrary `.ts.net` hostname is intentionally not wildcard-allowed. Production mode still supports `http://localhost:3000` and `http://<LAN-IP>:3000` alongside Tailscale. No hostname or `.env` change is needed.
 
 2. After installing and signing into Tailscale, open a **second terminal on the laptop**:
 
@@ -155,7 +314,7 @@ Serve preserves the browser's original `Host`. The existing write protection com
 
 All application navigation, API calls, downloads and PWA asset URLs use the current site. The `.ts.net` HTTPS URL provides a secure context for the existing service worker and home-screen installation. Offline edits are not supported: the service worker does not cache private API data. SQLite stays at `data/student.db` on the laptop, and JSON backup/restore and CSV export use the same authenticated API through every address. There is no database migration or cloud storage change for Tailscale.
 
-On your own devices, check login, a test task saved and visible through localhost, JSON/CSV downloads, logout and home-screen launch. Test away from home using mobile data and then QUT. Automated request tests simulate Serve's headers; **physical Tailscale, iPhone/iPad and QUT testing has not been performed by this repository update**. If you see “Request blocked”, check the exact Serve URL and root proxy mapping; do not disable origin protection or add arbitrary allowed origins.
+The user has confirmed successful private Tailscale HTTPS access from a phone on mobile data outside the home LAN. iPad, home-screen installation and QUT access should still be checked separately. Automated request tests simulate Serve's headers; they do not establish those additional device/network results. If you see “Request blocked”, check the exact Serve URL and root proxy mapping; do not disable origin protection or add arbitrary allowed origins.
 
 References: [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve), [Serve CLI commands](https://tailscale.com/docs/reference/tailscale-cli/serve), and [Serve's HTTP proxy implementation](https://github.com/tailscale/tailscale/blob/main/ipn/ipnlocal/serve.go).
 
@@ -269,16 +428,47 @@ Use **Settings → Add demo data**, or run `npm run db:seed`. Demo dates are rel
 
 ## Updating
 
-First back up. Stop the app. In your cloned repository:
+For an installation using automatic startup, use this order. Run each command separately; **stop if any step fails**.
 
-```bat
-git pull --ff-only
-npm install
-npm run build
-npm run start
-```
+1. While the app is still running, download a JSON backup through **Settings → Backups & data export**, then copy it somewhere separate from the laptop if possible.
+2. In your repository's Command Prompt, disable automatic startup and stop safely:
 
-Database migrations apply automatically. Your database, passwords, setup token and backups are ignored by Git. Do not delete the `data` folder during an update. If moving to another laptop, export a JSON backup and restore it in a fresh installation.
+   ```bat
+   schtasks /Change /TN "Student Dashboard" /Disable
+   node scripts/windows/dashboard.mjs stop
+   node scripts/windows/dashboard.mjs status
+   ```
+
+   Wait for the explicit stopped/free-port confirmation. For an old manually launched server, use its original terminal's `Ctrl+C` instead. If no scheduled task exists yet, skip the `schtasks` commands.
+3. With the application stopped, make a full copy of `data/` and `.env` to a safe location. The full database includes password hashes and sessions, unlike portable JSON. Preserve any SQLite journal/sidecar files along with it. Do not copy a live SQLite file as your only backup.
+4. Update and validate:
+
+   ```bat
+   git pull --ff-only
+   npm install
+   npm test
+   npm run typecheck
+   npm run build
+   ```
+
+   `npm install` runs the existing install hook, including checked-in migrations, so take the backup **before** installing. Do not delete `data/`, `.env` or `backups/`, run destructive Prisma commands, force Git updates or use `git clean -fdx`. Private files are ignored by Git and are not replaced by a normal pull. If a check fails, leave the task disabled and fix the failure; do not start against a partly built update.
+5. Before re-enabling the task, start the updated build manually:
+
+   ```bat
+   node scripts/windows/dashboard.mjs start
+   ```
+
+   In a second terminal, run `node scripts/windows/dashboard.mjs status`, then verify localhost login/records and the private Tailscale URL. Check LAN access if used. When satisfied, stop this manual instance and return control to the task:
+
+   ```bat
+   node scripts/windows/dashboard.mjs stop
+   schtasks /Change /TN "Student Dashboard" /Enable
+   schtasks /Run /TN "Student Dashboard"
+   ```
+
+   Wait for readiness and check status once more. Only one start method should own the server. Tailscale can remain running throughout maintenance; its URL will be temporarily unavailable while the app is stopped.
+
+A code rollback does not automatically reverse database migrations. Keep the pre-update backup and do not reset or downgrade SQLite blindly. If moving to another laptop, export JSON and restore it in a fresh installation, or follow the full SQLite backup procedure while both servers are stopped.
 
 ## Troubleshooting
 

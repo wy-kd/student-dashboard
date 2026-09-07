@@ -15,7 +15,7 @@ if (process.argv.includes('--install')) prisma(['generate']);
 prisma(['migrate', 'deploy']);
 if (!existsSync('data/setup-token'))
   writeFileSync('data/setup-token', randomBytes(18).toString('hex'), { mode: 0o600 });
-if (!process.argv.includes('--install'))
+if (!process.argv.includes('--install') && !process.argv.includes('--unattended'))
   console.log(
     '\nOpen http://localhost:3000\nFirst-time setup token (only used before a password is set): ' +
       readFileSync('data/setup-token', 'utf8') +
