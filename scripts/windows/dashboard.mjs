@@ -181,11 +181,16 @@ async function start() {
     loadEnvConfig(root, false, { info() {}, error() {} });
     const url = process.env.DATABASE_URL ?? '';
     try {
+      if (!url.startsWith('file:')) throw new Error();
+      // Windows can spell one file with a short (8.3) path, a long path or
+      // different letter casing. Compare filesystem identity, not path strings.
+      const selected = statSync(resolve(root, 'prisma', url.slice(5)), { bigint: true });
+      const expected = statSync(join(root, 'data', 'student.db'), { bigint: true });
       if (
-        !url.startsWith('file:') ||
-        realpathSync(resolve(root, 'prisma', url.slice(5))) !==
-          realpathSync(join(root, 'data', 'student.db')) ||
-        statSync(join(root, 'data', 'student.db')).size === 0
+        !selected.isFile() ||
+        selected.dev !== expected.dev ||
+        selected.ino !== expected.ino ||
+        expected.size === 0n
       )
         throw new Error();
     } catch {

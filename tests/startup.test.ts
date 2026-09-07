@@ -83,6 +83,19 @@ test(
       assert.equal(occupied.listening, true, 'unrelated listener is never killed');
       await new Promise<void>((done) => occupied.close(() => done()));
 
+      put('data/other.db', 'a different database');
+      put(
+        'node_modules/@next/env/index.js',
+        "exports.loadEnvConfig = () => { process.env.DATABASE_URL = 'file:../data/other.db'; };",
+      );
+      assert.match(
+        (await command(root, 'start')).output,
+        /database\/configuration missing or mismatched/,
+      );
+      assert.equal(existsSync(join(root, 'migration-calls.txt')), false);
+      assert.equal(readFileSync(join(root, 'data/other.db'), 'utf8'), 'a different database');
+      put('node_modules/@next/env/index.js', 'exports.loadEnvConfig = () => {};');
+
       active = launch(root, 'start');
       await waitReady(active);
       assert.equal((await command(root, 'status')).code, 0);
