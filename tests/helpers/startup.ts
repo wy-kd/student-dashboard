@@ -47,7 +47,7 @@ export async function command(root: string, action: string) {
 }
 
 export async function waitReady(run: ReturnType<typeof launch>) {
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     if (run.output().includes('Ready: production')) return;
     if (run.child.exitCode !== null) throw new Error('Startup failed: ' + run.output());

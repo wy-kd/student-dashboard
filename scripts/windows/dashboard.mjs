@@ -17,6 +17,7 @@ import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { checkHealth, waitForReadiness } from './readiness.mjs';
 
 const root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
 const require = createRequire(join(root, 'package.json'));
@@ -57,20 +58,6 @@ async function portIsFree() {
       probe.close(() => done(true)),
     );
   });
-}
-
-async function healthy() {
-  try {
-    const response = await fetch('http://127.0.0.1:3000/api/auth', {
-      signal: AbortSignal.timeout(3000),
-      redirect: 'error',
-    });
-    if (!response.ok) return false;
-    const body = await response.json();
-    return typeof body.setup === 'boolean' && body.signedIn === false;
-  } catch {
-    return false;
-  }
 }
 
 function control(action, state = readState()) {
@@ -151,6 +138,10 @@ async function start() {
   process.on('exit', (code) => {
     if (!ownsControl) return;
     try {
+      if (phase === 'starting')
+        log(
+          `Next.js process exited before readiness succeeded (code ${code}); startup failed immediately.`,
+        );
       log(`Process exited during ${phase} (code ${code}).`);
       if (readState()?.token === token) rmSync(stateFile, { force: true });
     } catch {
@@ -237,8 +228,14 @@ async function start() {
     process.stderr.write = discard;
     const { nextStart } = require('next/dist/cli/next-start');
     // This is the entry point used by `next start`, not a custom Next HTTP server.
-    await nextStart({ port: 3000, hostname: '0.0.0.0' }, root);
-    if (!(await healthy())) throw new Error('health');
+    log(
+      'Checking readiness for up to 60 seconds; request timeout 5 seconds, retry pause 1 second.',
+    );
+    const readiness = await waitForReadiness(
+      () => nextStart({ port: 3000, hostname: '0.0.0.0' }, root),
+      log,
+    );
+    if (!readiness.ok) throw new Error('health');
     phase = 'ready';
     log(`Ready: production HTTP and database check passed (PID ${process.pid}).`);
     if (stopping) {
@@ -260,7 +257,7 @@ async function start() {
         'Existing local database/configuration missing or mismatched. Nothing was provisioned. Check .env and data/student.db.',
       port: 'Port 3000 is occupied or unavailable. Stop the existing server yourself; no process was killed and no migrations ran.',
       health:
-        'Production HTTP/database check failed. Review installation and migration status before restarting.',
+        'Production readiness failed; requesting graceful shutdown. See the last readiness failure above.',
     };
     log(
       diagnostics[error.message] ??
@@ -298,9 +295,10 @@ async function main() {
     return;
   }
   if (action === 'status') {
-    const ok = status.phase === 'ready' && (await healthy());
+    const health = status.phase === 'ready' ? await checkHealth() : null;
+    const ok = health?.ok ?? false;
     say(
-      `Managed dashboard: ${status.phase}, PID ${status.pid}. HTTP/database check: ${ok ? 'OK' : 'not ready'}.`,
+      `Managed dashboard: ${status.phase}, PID ${status.pid}. HTTP/database check: ${ok ? 'OK' : (health?.reason ?? 'not ready')}.`,
     );
     process.exitCode = ok ? 0 : 1;
     return;

@@ -16,7 +16,7 @@ import { command, launch, waitReady } from './helpers/startup';
 
 test(
   'Production lifecycle: preflight, singleton, secret-free logs and graceful stop (paths with spaces)',
-  { timeout: 90_000 },
+  { timeout: 240_000 },
   async () => {
     const root = mkdtempSync(join(tmpdir(), 'Student Dashboard fixture '));
     const put = (path: string, content: string) => {
@@ -24,7 +24,7 @@ test(
       mkdirSync(resolve(full, '..'), { recursive: true });
       writeFileSync(full, content);
     };
-    for (const file of ['dashboard.ps1', 'dashboard.mjs']) {
+    for (const file of ['dashboard.ps1', 'dashboard.mjs', 'readiness.mjs']) {
       mkdirSync(join(root, 'scripts/windows'), { recursive: true });
       copyFileSync(resolve('scripts/windows', file), join(root, 'scripts/windows', file));
     }
@@ -132,6 +132,82 @@ test(
       await waitReady(active);
       assert.equal((await command(root, 'stop')).code, 0);
       await active.exited;
+
+      // Exercise the real 60-second production readiness budget, not a shortened
+      // test-only timeout. The HTTP listener is open well before the app is ready.
+      const delayedHealth = (healthyAfter: number, neverInitialise = false) => `
+        const http = require('node:http');
+        const fs = require('node:fs');
+        exports.nextStart = async () => {
+          const began = Date.now();
+          const server = http.createServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(Date.now() - began >= ${healthyAfter}
+              ? '{"setup":false,"signedIn":false}'
+              : '{"private":"fixture-response-body-SECRET"}');
+          });
+          process.on('SIGTERM', () => {
+            fs.writeFileSync('graceful-readiness-stop.txt', 'requested');
+            server.close(() => process.exit(143));
+          });
+          await new Promise(done => server.listen(3000, '0.0.0.0', done));
+          if (${neverInitialise}) await new Promise(() => {});
+        };`;
+      put('node_modules/next/dist/cli/next-start.js', delayedHealth(25_000));
+      active = launch(root, 'start');
+      await waitReady(active);
+      const timestamps = active.output().split('\n');
+      const began = Date.parse(
+        timestamps.find((line) => line.includes('Checking readiness'))!.split(' ')[0],
+      );
+      const ready = Date.parse(
+        timestamps.find((line) => line.includes('Ready: production'))!.split(' ')[0],
+      );
+      assert.ok(ready - began >= 25_000 && ready - began < 60_000, active.output());
+      assert.match(active.output(), /database\/application health failure/);
+      assert.equal((await command(root, 'stop')).code, 0);
+      assert.equal(await active.exited, 143);
+
+      // Even an unresolved Next initialisation promise cannot evade the deadline.
+      rmSync(join(root, 'graceful-readiness-stop.txt'));
+      put('node_modules/next/dist/cli/next-start.js', delayedHealth(120_000, true));
+      active = launch(root, 'start');
+      assert.equal(await active.exited, 143, 'genuine deadline invokes graceful shutdown');
+      assert.match(
+        active.output(),
+        /deadline reached after 60 seconds; last failure: (database\/application health failure|HTTP timeout)/,
+      );
+      assert.doesNotMatch(active.output(), /Ready: production|SECRET/);
+      assert.equal(readFileSync(join(root, 'graceful-readiness-stop.txt'), 'utf8'), 'requested');
+      assert.equal(
+        (await command(root, 'stop')).code,
+        0,
+        'process and singleton channel are released',
+      );
+      assert.equal(
+        readFileSync(join(root, 'data/student.db'), 'utf8'),
+        'existing fixture database bytes',
+      );
+
+      put(
+        'node_modules/next/dist/cli/next-start.js',
+        'exports.nextStart = async () => { process.exit(42); };',
+      );
+      let before = Date.now();
+      const earlyExit = await command(root, 'start');
+      assert.equal(earlyExit.code, 42);
+      assert.ok(Date.now() - before < 15_000, 'early exit does not wait out the readiness budget');
+      assert.match(earlyExit.output, /process exited before readiness succeeded \(code 42\)/);
+      put(
+        'node_modules/next/dist/cli/next-start.js',
+        "exports.nextStart = async () => { throw new Error('fixture-startup-error-SECRET'); };",
+      );
+      before = Date.now();
+      const rejected = await command(root, 'start');
+      assert.equal(rejected.code, 1);
+      assert.ok(Date.now() - before < 15_000);
+      assert.match(rejected.output, /Next.js startup failed before readiness/);
+      assert.doesNotMatch((await command(root, 'logs')).output, /SECRET/);
 
       // A migration error stops startup and exposes only a safe public Prisma code.
       put('scripts/setup.mjs', "console.error('P3009 fixture-password-SECRET'); process.exit(1);");

@@ -76,7 +76,11 @@ npm run build
 node scripts/windows/dashboard.mjs start
 ```
 
-Run each command separately and stop if one fails. The start command stays in the foreground for the lifetime of the server. Wait for **Ready: production HTTP and database check passed**. In a second terminal in the repository:
+Run each command separately and stop if one fails. The start command stays in the foreground for the lifetime of the server. Wait for **Ready: production HTTP and database check passed**. Cold boot can take longer than a manual start: the launcher allows **60 seconds from invoking Next.js production startup**, after migrations finish. It checks `/api/auth` immediately, allows up to **5 seconds per HTTP request** (including reading the response), then pauses **1 second after a failed check** before retrying. Each request/pause is capped by the remaining overall budget. Next.js initialisation and the endpoint's SQLite query must both succeed; an open port alone is not readiness.
+
+Logs report each failed attempt and the final cause: connection refused, HTTP timeout, non-success HTTP status or an invalid database/application health response. HTTP 500 from this endpoint can indicate a failed database query. Response bodies and exception text are never logged. If Next.js exits before becoming ready, the launcher exits immediately and records its exit code. Next.js runs inside the launcher process, so there is no separate application child to wait for. A rejected startup promise also fails immediately. A genuine 60-second readiness failure still uses Next.js's graceful shutdown handler; it does not force-kill the server.
+
+In a second terminal in the repository:
 
 ```bat
 node scripts/windows/dashboard.mjs status
@@ -178,7 +182,7 @@ All three are needed. Keep the laptop powered on, awake and connected to the int
 ### 6. Full reboot test
 
 1. Confirm **Student Dashboard** is enabled, Tailscale **Run unattended** is enabled and `tailscale serve status` shows the existing private proxy to `http://127.0.0.1:3000`.
-2. Restart Windows using **Restart**, leave it at the sign-in screen and wait about two minutes.
+2. Restart Windows using **Restart**, leave it at the sign-in screen and wait about three minutes (the task delay and migrations run before the readiness window).
 3. On your phone, turn Wi-Fi off, keep Tailscale connected and open your existing HTTPS `.ts.net` URL. Sign in and verify existing records. This checks startup before Windows sign-in.
 4. Sign in to Windows. In the repository, run `node scripts/windows/dashboard.mjs status` and `node scripts/windows/dashboard.mjs logs`. Confirm the startup timestamp and ready message, then check `http://localhost:3000` and the LAN URL.
 5. Create a small test task, restart again and verify it remains. Check that attempting another managed start refuses a duplicate.
