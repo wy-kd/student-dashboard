@@ -180,6 +180,7 @@ test('countdown pause/resume and recovery use timestamps; completion saves once 
   assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'Completed');
 });
 test('stopwatch, start retry, stale device commands and cancel retain one active timer', async () => {
+  const sessionCount = await db.studySession.count();
   const timer = {
     requestId: randomUUID(),
     name: 'Reading',
@@ -214,6 +215,7 @@ test('stopwatch, start retry, stale device commands and cancel retain one active
     base + 60000,
   );
   assert.equal(await db.studyTimer.count({ where: { activeKey: 'owner' } }), 0);
+  assert.equal(await db.studySession.count(), sessionCount, 'cancel never records study time');
 });
 test('reminders deduplicate missed offsets, recover after restart, reschedule and cancel completed records', async () => {
   await reconcileReminders('owner', base);
@@ -770,6 +772,151 @@ test('two authenticated timer clients receive start/pause/resume/finish/cancel i
   const { announceTimerChange } = await import('../lib/timer-events');
   announceTimerChange('owner');
   assert.equal((await pending).status, 401);
+});
+test('personal to-dos create, retry, edit, order, complete and delete without academic side effects', async () => {
+  const before = await snapshot();
+  const add = {
+    action: 'todo.create',
+    requestId: randomUUID(),
+    todo: { name: 'Email tutor', dueDate: null },
+  };
+  const a = (await act('owner', add)) as any;
+  assert.equal(((await act('owner', add)) as any).id, a.id);
+  assert.equal(await db.todoItem.count(), 1);
+  const b = (await act('owner', {
+    ...add,
+    requestId: randomUUID(),
+    todo: { name: 'Bring calculator', dueDate: '2026-09-20' },
+  })) as any;
+  let edited = (await act('owner', {
+    action: 'todo.save',
+    id: a.id,
+    revision: a.revision,
+    todo: { name: 'Email IFB240 tutor', dueDate: '2026-09-21' },
+  })) as any;
+  await assert.rejects(
+    act('owner', {
+      action: 'todo.save',
+      id: a.id,
+      revision: a.revision,
+      todo: { name: 'Stale edit', dueDate: null },
+    }),
+    /changed/,
+  );
+  await assert.rejects(
+    act('owner', {
+      ...add,
+      requestId: randomUUID(),
+      todo: { name: 'Impossible date', dueDate: '2026-02-30' },
+    }),
+  );
+  await assert.rejects(
+    act('owner', { ...add, requestId: randomUUID(), todo: { name: '   ', dueDate: null } }),
+  );
+  await act('owner', { action: 'todo.move', id: b.id, revision: b.revision, delta: -1 });
+  const ordered = (await productivitySnapshot('owner')).todos;
+  assert.deepEqual(
+    ordered.map((r) => r.id),
+    [b.id, a.id],
+  );
+  edited = ordered[1];
+  let toggled = (await act('owner', {
+    action: 'todo.complete',
+    id: edited.id,
+    revision: edited.revision,
+    completed: true,
+  })) as any;
+  assert.equal(toggled.completed, true);
+  assert.equal(toggled.name, 'Email IFB240 tutor');
+  toggled = (await act('owner', {
+    action: 'todo.complete',
+    id: toggled.id,
+    revision: toggled.revision,
+    completed: false,
+  })) as any;
+  assert.equal(toggled.completed, false);
+  await assert.rejects(
+    act('someone-else', { action: 'todo.delete', id: toggled.id, revision: toggled.revision }),
+    /changed/,
+  );
+  await act('owner', { action: 'todo.delete', id: toggled.id, revision: toggled.revision });
+  assert.equal(await db.todoItem.count(), 1);
+  assert.deepEqual(await snapshot(), before);
+});
+test('to-do HTTP actions retain authentication/origin checks and widget completion updates the shared snapshot', async () => {
+  const token = 'todo-api-fixture';
+  await db.session.create({
+    data: { id: hashToken(token), userId: 'owner', expiresAt: Date.now() + 60000 },
+  });
+  const body = {
+    action: 'todo.create',
+    requestId: randomUUID(),
+    todo: { name: 'Print worksheet', dueDate: null },
+  };
+  const post = (value: any, headers: Record<string, string>) =>
+    api.POST(
+      new NextRequest('http://localhost:3000/api/productivity', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(value),
+      }),
+    );
+  const headers = {
+    origin: 'http://localhost:3000',
+    host: 'localhost:3000',
+    cookie: 'student_session=' + token,
+  };
+  assert.equal((await post(body, { origin: headers.origin, host: headers.host })).status, 401);
+  assert.equal((await post(body, { ...headers, origin: 'https://untrusted.example' })).status, 403);
+  assert.equal((await post(body, headers)).status, 200);
+  const read = () =>
+    api.GET(new NextRequest('http://localhost:3000/api/productivity', { headers }));
+  const row = (await (await read()).json()).todos.find((r: any) => r.id === body.requestId);
+  assert.equal(
+    (
+      await post(
+        { action: 'todo.complete', id: row.id, revision: row.revision, completed: true },
+        headers,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await (await read()).json()).todos.find((r: any) => r.id === row.id).completed,
+    true,
+  );
+  await db.session.delete({ where: { id: hashToken(token) } });
+});
+test('to-do backups restore content/order/completion, reject invalid data and accept older V2 backups', async () => {
+  const backup = await exportBackup();
+  assert.ok(backup.productivity.todoItem.length > 0);
+  const row = backup.productivity.todoItem[0];
+  let edited = row;
+  for (let i = 0; i < 3; i++)
+    edited = (await act('owner', {
+      action: 'todo.save',
+      id: edited.id,
+      revision: edited.revision,
+      todo: { name: 'Changed ' + i, dueDate: null },
+    })) as any;
+  await restoreBackup(backup);
+  const restored = await db.todoItem.findUniqueOrThrow({ where: { id: row.id } });
+  for (const key of ['name', 'dueDate', 'position', 'completed'] as const)
+    assert.equal(restored[key], row[key]);
+  assert.ok(restored.revision > edited.revision);
+  await assert.rejects(
+    act('owner', { action: 'todo.delete', id: edited.id, revision: edited.revision }),
+    /changed/,
+  );
+  const bad = structuredClone(backup);
+  bad.productivity.todoItem[0].dueDate = '2026-02-30';
+  await assert.rejects(restoreBackup(bad));
+  assert.equal(await db.todoItem.count(), backup.productivity.todoItem.length);
+  const old = structuredClone(backup);
+  delete (old.productivity as any).todoItem;
+  await restoreBackup(old);
+  assert.equal(await db.todoItem.count(), 0, 'pre-To-do snapshots remain readable');
+  await restoreBackup(backup);
 });
 test('V2 JSON backup round-trips new relational state and V1 still imports without touching auth', async () => {
   const backup = await exportBackup();

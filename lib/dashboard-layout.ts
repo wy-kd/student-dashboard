@@ -7,6 +7,7 @@ export const widgetNames = {
   alerts: 'Alerts',
   classes: "Today's classes",
   tasks: 'Tasks',
+  todo: 'To-do list',
   assignments: 'Assignment progress',
   exams: 'Exams',
   calendar: 'Calendar',
@@ -29,9 +30,9 @@ const widgetSchema = z
   .strict();
 export const layoutSchema = z
   .object({
-    desktop: z.array(widgetSchema).max(16),
-    tablet: z.array(widgetSchema).max(16),
-    mobile: z.array(widgetSchema).max(16),
+    desktop: z.array(widgetSchema).max(Object.keys(widgetNames).length),
+    tablet: z.array(widgetSchema).max(Object.keys(widgetNames).length),
+    mobile: z.array(widgetSchema).max(Object.keys(widgetNames).length),
   })
   .strict()
   .superRefine((v, ctx) => {
@@ -77,7 +78,14 @@ export function defaultLayout(): Layout {
 }
 export function readLayout(raw?: string): Layout {
   try {
-    return layoutSchema.parse(JSON.parse(raw || ''));
+    const layout = layoutSchema.parse(JSON.parse(raw || ''));
+    // Extend saved layouts without resetting their order, size or visibility.
+    const defaults = defaultLayout();
+    for (const bp of ['desktop', 'tablet', 'mobile'] as const)
+      for (const widget of defaults[bp])
+        if (!layout[bp].some((w) => w.id === widget.id))
+          layout[bp].push({ ...widget, hidden: true });
+    return layout;
   } catch {
     return defaultLayout();
   }

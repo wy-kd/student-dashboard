@@ -26,6 +26,7 @@ import {
 import { SemesterWeek } from './SemesterWeek';
 import { teachingWeekInfo } from '@/lib/teaching-weeks';
 import { StudyTimer } from './StudyTimer';
+import { TodoList } from './TodoList';
 import { Today, WeeklySummary } from './DailyPlanning';
 export function Dashboard({ todayOnly = false }: { todayOnly?: boolean }) {
   if (todayOnly) return <Today />;
@@ -98,6 +99,8 @@ function WidgetDashboard() {
             action={() => open({ entity: 'assignment' })}
           />
         );
+      case 'todo':
+        return <TodoList compact />;
       case 'timer':
         return <StudyTimer compact />;
       case 'today':
@@ -273,7 +276,6 @@ function WidgetDashboard() {
       case 'semester':
         return semester ? (
           <>
-            <p>{semester.name}</p>
             <SemesterWeek semester={semester} now={now} data={d} />
             <Progress value={semesterProgress(semester, now, d).percent} label="Semester elapsed" />
           </>

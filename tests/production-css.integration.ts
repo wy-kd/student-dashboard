@@ -20,5 +20,9 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.timer-float\{[^}]*position:fixed/);
   assert.match(css, /\.widget-size-fields\{[^}]*gap:16px/);
   assert.match(css, /\.semester-break-editor\{[^}]*gap:22px/);
+  assert.match(css, /\.calendar\.day \.day-label b[^}]*width:auto/);
+  assert.match(css, /\.semester-summary\{[^}]*font-weight:700/);
+  assert.match(css, /\.todo-add-line\{[^}]*gap:10px/);
+  assert.match(css, /\.mini-timer-cancel\{[^}]*min-height:44px/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

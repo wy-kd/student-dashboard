@@ -12,7 +12,11 @@ export function SemesterWeek({
   const info = teachingWeekInfo(semester, now, data);
   return (
     <div className="semester-week">
-      <strong>{info.label}</strong>
+      <strong className="semester-summary">
+        <span>{semester.name}</span>
+        <span aria-hidden="true">|</span>
+        <span>{info.label}</span>
+      </strong>
       {info.resumeDate && <p>{teachingResumeLabel(info)}</p>}
     </div>
   );

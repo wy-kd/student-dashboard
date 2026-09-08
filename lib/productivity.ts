@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { todoAction, todoOrder } from './todos';
 import { db } from './db';
 import { AppError, validateRelations, cleanInput } from './service';
 import { schemaFor } from './validation';
@@ -99,25 +100,27 @@ export async function generateOccurrences(client: any, userId: string, now: stri
 export async function productivitySnapshot(userId: string) {
   return db.$transaction(async (tx) => {
     const preference = await ensurePreferences(userId, tx);
-    const [timer, inbox, recurrences, rules, notifications, subscriptions] = await Promise.all([
-      tx.studyTimer.findUnique({ where: { activeKey: userId } }),
-      tx.inboxItem.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      tx.recurrence.findMany({
-        where: { userId },
-        include: { occurrences: { select: { taskId: true, date: true } } },
-      }),
-      tx.reminderRule.findMany({ where: { userId }, orderBy: { leadMinutes: 'desc' } }),
-      tx.notification.findMany({
-        where: { userId, dismissed: false },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        include: { reminder: true },
-      }),
-      tx.pushSubscription.findMany({
-        where: { userId },
-        select: { id: true, name: true, origin: true, createdAt: true },
-      }),
-    ]);
+    const [timer, inbox, recurrences, rules, notifications, subscriptions, todos] =
+      await Promise.all([
+        tx.studyTimer.findUnique({ where: { activeKey: userId } }),
+        tx.inboxItem.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+        tx.recurrence.findMany({
+          where: { userId },
+          include: { occurrences: { select: { taskId: true, date: true } } },
+        }),
+        tx.reminderRule.findMany({ where: { userId }, orderBy: { leadMinutes: 'desc' } }),
+        tx.notification.findMany({
+          where: { userId, dismissed: false },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+          include: { reminder: true },
+        }),
+        tx.pushSubscription.findMany({
+          where: { userId },
+          select: { id: true, name: true, origin: true, createdAt: true },
+        }),
+        tx.todoItem.findMany({ where: { userId }, orderBy: [...todoOrder] }),
+      ]);
     return {
       preference,
       timer,
@@ -126,6 +129,7 @@ export async function productivitySnapshot(userId: string) {
       rules,
       notifications,
       subscriptions,
+      todos,
       serverNow: Date.now(),
     };
   });
@@ -285,6 +289,7 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
 export async function productivityAction(userId: string, b: any, now = Date.now()) {
   if (typeof b.action !== 'string') throw new AppError('Choose an action.');
   if (b.action.startsWith('timer.')) return timerAction(userId, b, now);
+  if (b.action.startsWith('todo.')) return todoAction(userId, b);
   return db.$transaction(async (tx) => {
     const setting = await tx.setting.findUnique({ where: { id: 'settings' } }),
       civil = civilNow(setting?.timezone, new Date(now));

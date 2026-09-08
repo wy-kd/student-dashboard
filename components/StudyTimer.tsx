@@ -305,6 +305,12 @@ export function StudyTimer({
     </div>
   );
 }
+export async function requestTimerCancellation(
+  discard: () => Promise<void>,
+  confirmDiscard: (message: string) => boolean = (message) => window.confirm(message),
+) {
+  if (confirmDiscard('Cancel this timer session? Elapsed time will not be saved.')) await discard();
+}
 export function MiniTimer() {
   const { state, go, act, notify } = useProductivity(),
     t = state?.timer;
@@ -381,6 +387,14 @@ export function MiniTimer() {
           </>
         )}
       </div>
+      <button
+        type="button"
+        className="text-button mini-timer-cancel"
+        disabled={busy}
+        onClick={() => void requestTimerCancellation(() => run('timer.cancel'))}
+      >
+        Cancel timer
+      </button>
     </aside>
   );
 }

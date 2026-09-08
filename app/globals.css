@@ -2973,20 +2973,6 @@ td:first-child {
   display: block;
   height: 220px;
 }
-.date-input {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.date-input small {
-  font-size: 0.875rem;
-  color: var(--muted);
-}
-.date-input input {
-  width: 100%;
-  min-width: 0;
-}
 .semester-week {
   margin: 16px 0;
 }
@@ -3211,5 +3197,184 @@ td:first-child {
   }
   .has-floating-timer main#main::after {
     display: none;
+  }
+}
+
+/* V2.1.3: full dates need space, unlike the month view's day-number badge. */
+.calendar.week {
+  grid-template-columns: repeat(7, minmax(130px, 1fr));
+  overflow-x: auto;
+}
+.calendar.week .day-label,
+.calendar.day .day-label {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 52px;
+}
+.calendar.week .day-label b,
+.calendar.day .day-label b {
+  width: auto;
+  height: auto;
+  padding: 5px 7px;
+  white-space: nowrap;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.semester-week .semester-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.mini-timer-cancel {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+}
+.timer-float .mini-timer {
+  row-gap: 8px;
+}
+.todo-section {
+  margin-bottom: 28px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  scroll-margin-top: 20px;
+}
+.todo-section h2 {
+  margin: 0 0 8px;
+}
+.todo-section > p {
+  margin-bottom: 20px;
+}
+.todo-add-line {
+  display: flex;
+  gap: 10px;
+}
+.todo-add-line input {
+  flex: 1;
+  min-width: 0;
+}
+.todo-options {
+  margin-top: 12px;
+}
+.todo-options summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 8px 0;
+}
+.todo-options .field {
+  max-width: 230px;
+  margin-top: 10px;
+}
+.todo-count {
+  margin: 16px 0 12px;
+  font-size: 0.875rem;
+}
+.todo-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.todo-items > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.todo-item-main {
+  flex: 1;
+  min-width: 180px;
+}
+.todo-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.todo-check input {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.todo-check span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.todo-item-main small {
+  display: block;
+  margin: 2px 0 0 32px;
+  color: var(--muted);
+}
+.todo-items .is-complete .todo-check span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.todo-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.todo-actions button {
+  min-height: 44px;
+}
+.todo-order {
+  display: flex;
+  gap: 8px;
+}
+.todo-delete {
+  margin-left: 12px;
+}
+.todo-edit {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+.todo-edit .field {
+  max-width: 600px;
+}
+.todo-view-all {
+  display: inline-block;
+  margin-top: 12px;
+  min-height: 44px;
+}
+.todo-preview .todo-item-main {
+  min-width: 0;
+}
+.todo-preview .todo-items > li {
+  padding: 4px 0;
+}
+@media (max-width: 767px) {
+  .calendar.week {
+    display: block;
+    overflow: visible;
+  }
+  .calendar.week .day-label,
+  .calendar.day .day-label {
+    flex-direction: row;
+    align-items: center;
+    min-height: 44px;
+    gap: 12px;
+  }
+  .todo-section {
+    padding: 18px;
+  }
+  .todo-items .todo-actions {
+    width: 100%;
+    gap: 12px;
+  }
+  .todo-delete {
+    margin-left: auto;
   }
 }

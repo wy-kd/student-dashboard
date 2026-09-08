@@ -97,6 +97,13 @@ export async function restoreBackup(input: any) {
           const previous = current[e].find((r) => r.id === row.id);
           if (previous) row.revision = Math.max(row.revision, previous.revision + 1);
         }
+      if (extra?.todoItem) {
+        const currentTodos = await tx.todoItem.findMany();
+        for (const row of extra.todoItem) {
+          const old = currentTodos.find((item) => item.id === row.id);
+          if (old) row.revision = Math.max(row.revision, old.revision + 1);
+        }
+      }
       await clearProductivity(tx);
       for (const e of [...exportOrder].reverse()) await c[e].deleteMany();
       for (const e of exportOrder)

@@ -504,7 +504,6 @@ export function Analytics() {
           const p = semesterProgress(s, now, d);
           return (
             <div className="progress-row" key={s.id}>
-              <strong>{s.name}</strong>
               <SemesterWeek semester={s} now={now} data={d} />
               <Progress value={p.percent} label="Elapsed" />
               <p className="muted">

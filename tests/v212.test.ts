@@ -147,7 +147,7 @@ test('calendar suppresses classes at break boundaries, resumes without duplicate
   );
   assert.equal(JSON.stringify(d), before, 'display must not mutate records or class series');
 });
-test('native entry keeps ISO values and exposes an Australian formatted accessible hint', () => {
+test('native entry keeps ISO values and Australian locale without duplicate date text', () => {
   const html = renderToStaticMarkup(
     React.createElement(DateTimeInput, {
       type: 'datetime-local',
@@ -158,8 +158,7 @@ test('native entry keeps ISO values and exposes an Australian formatted accessib
   assert.match(html, /type="datetime-local"/);
   assert.match(html, /value="2026-09-08T17:00"/);
   assert.match(html, /lang="en-AU"/);
-  assert.match(html, /aria-describedby=/);
-  assert.match(html, /08\/09\/2026 · 5:00 PM/);
+  assert.doesNotMatch(html, /<small|08\/09\/2026/);
 });
 test('semester manager reuses break records with formatted dates and separate edit/delete actions', () => {
   const d = data();

@@ -2,6 +2,7 @@
 import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
 import { RecurringTasks } from './RecurringTasks';
+import { TodoList } from './TodoList';
 import { Plus, ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { useApp, titleFor } from './context';
 import {
@@ -116,6 +117,11 @@ export function Tasks() {
   return (
     <>
       <Heading title="Tasks" sub="Turn bigger goals into the next small step." entity="task" />
+      <section id="todo-list" className="todo-section" aria-labelledby="todo-heading">
+        <h2 id="todo-heading">To-do list</h2>
+        <p className="muted">A quick personal checklist, separate from your academic tasks.</p>
+        <TodoList />
+      </section>
       <RecurringTasks />
       <section className="ordinary-tasks" aria-labelledby="tasks-list-heading">
         <h2 id="tasks-list-heading">Tasks</h2>

@@ -9,6 +9,7 @@ model User {
   preference Preference?
   timers StudyTimer[]
   inbox InboxItem[]
+  todos TodoItem[]
   recurrences Recurrence[]
   rules ReminderRule[]
   reminders Reminder[]
@@ -412,4 +413,16 @@ model PushDelivery {
   deliveredAt Float?
   @@unique([notificationId, subscriptionId])
   @@index([deliveredAt, nextAttempt])
+}
+
+model TodoItem {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  completed Boolean @default(false)
+  dueDate String?
+  position Int @default(0)
+  revision Int @default(0)
+  @@index([userId, position])
 }

@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { todoSchema } from './todos';
 import { z } from 'zod';
 import { AppError } from './service';
 import { layoutSchema } from './dashboard-layout';
@@ -8,6 +9,7 @@ import { preferenceSchema, recurrenceSchema } from './productivity';
 export const productivityTables = [
   'preference',
   'inboxItem',
+  'todoItem',
   'recurrence',
   'taskOccurrence',
   'studyTimer',
@@ -27,8 +29,9 @@ export function parseProductivity(input: any) {
   const parsed: any = {};
   let count = 0;
   for (const name of productivityTables) {
-    if (!Array.isArray(input[name])) throw new AppError('Missing V2 backup table: ' + name);
-    count += input[name].length;
+    const records = name === 'todoItem' && input[name] === undefined ? [] : input[name];
+    if (!Array.isArray(records)) throw new AppError('Missing V2 backup table: ' + name);
+    count += records.length;
     if (count > 20000) throw new AppError('V2 backup exceeds 20,000 records.');
     const model = Prisma.dmmf.datamodel.models.find(
       (m) => m.name.toLowerCase() === name.toLowerCase(),
@@ -48,13 +51,19 @@ export function parseProductivity(input: any) {
     }
     const schema = z.object(fields).strict(),
       ids = new Set();
-    parsed[name] = input[name].map((raw: any) => {
+    parsed[name] = records.map((raw: any) => {
       const row: any = schema.parse(raw),
         id = row.id ?? row.userId;
       if (ids.has(id)) throw new AppError('Duplicate V2 backup ID.');
       ids.add(id);
       if (row.userId && row.userId !== 'owner')
         throw new AppError('V2 backup must belong to this single-owner workspace.');
+      if (name === 'todoItem') {
+        todoSchema.parse({ name: row.name, dueDate: row.dueDate });
+        if (row.position < 0 || row.revision < 0)
+          throw new AppError('Invalid to-do order or revision.');
+        row.revision++;
+      }
       if (name === 'reminderRule') {
         if (
           !['assignment', 'exam', 'task', 'studySession'].includes(row.kind) ||

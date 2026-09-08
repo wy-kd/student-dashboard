@@ -72,6 +72,7 @@ test(
       cookie: 'student_session=' + token,
     };
     const timerId = randomUUID();
+    const todoId = randomUUID();
     let active: ReturnType<typeof launch> | undefined;
     try {
       for (let cycle = 0; cycle < 2; cycle++) {
@@ -99,6 +100,24 @@ test(
           productivity.notifications.length,
           'server scheduler creates persisted reminders without a browser',
         );
+        if (cycle === 0) {
+          const todoResponse = await fetch('http://127.0.0.1:3000/api/productivity', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              action: 'todo.create',
+              requestId: todoId,
+              todo: { name: 'Preserved checklist item', dueDate: '2026-09-20' },
+            }),
+          });
+          assert.equal(todoResponse.status, 200);
+        } else {
+          assert.equal(
+            productivity.todos.find((row: any) => row.id === todoId)?.name,
+            'Preserved checklist item',
+            'to-do survives a production restart',
+          );
+        }
         if (cycle === 0) {
           let idleReplied = false;
           const idleObserver = fetch('http://127.0.0.1:3000/api/timer?cursor=none', {

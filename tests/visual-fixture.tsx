@@ -165,6 +165,32 @@ d.productivity = {
       readAt: null,
     },
   ],
+  todos: [
+    {
+      id: 'todo-email',
+      name: 'Email tutor about the report',
+      completed: false,
+      dueDate: '2026-09-09',
+      position: 0,
+      revision: 0,
+    },
+    {
+      id: 'todo-print',
+      name: 'Print worksheet',
+      completed: false,
+      dueDate: null,
+      position: 1,
+      revision: 0,
+    },
+    {
+      id: 'todo-calculator',
+      name: 'Bring calculator',
+      completed: true,
+      dueDate: null,
+      position: 2,
+      revision: 0,
+    },
+  ],
   subscriptions: [],
   serverNow: Date.now(),
   pushPublicKey: null,
@@ -186,6 +212,7 @@ function Harness() {
   data.productivity = {
     ...d.productivity,
     recurrences: empty ? [] : d.productivity.recurrences,
+    todos: empty ? [] : d.productivity.todos,
     serverNow: Date.now(),
     timer: timer
       ? {
@@ -244,7 +271,7 @@ function Harness() {
               ? 'Calendar'
               : url === '/notifications'
                 ? 'Notifications'
-                : url === '/tasks'
+                : url.startsWith('/tasks')
                   ? 'Tasks'
                   : url === '/review'
                     ? 'Review'

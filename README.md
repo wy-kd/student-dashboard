@@ -547,3 +547,13 @@ An incremental production build reproduced stale CSS after source edits. Product
 **Back up your real university data before updating.** Follow the [V2.1.2 backup, verification, Acer update and exact recovery guide](docs/V2.1.2-GUIDE.md). It includes a dated full `data`/`.env` copy outside the repository, JSON verification, Settings/CLI JSON restore and full database/environment recovery.
 
 This release adds consistent Australian date/time display, readable Dashboard edit controls, native-input format hints, ordinary-field autocomplete suppression, teaching-week states, Semester Break management using existing records and a compact floating timer with End → review. No database migration, seed/reset, new dependency or Windows/Tailscale/authentication/timer-sync architecture change is required.
+
+## V2.1.3 cleanup and personal checklist
+
+**Back up your real university data before pulling.** Follow the [V2.1.3 backup, verification, Acer update and exact recovery guide](docs/V2.1.3-GUIDE.md), including JSON export, a stopped full `data`/`.env` copy outside the repository and recovery commands.
+
+This release removes duplicate native-input date hints, fixes timetable date-header sizing, combines semester identity/week into one bold summary and adds confirmed Cancel to the floating timer. Cancel discards unsaved time; End retains the existing review/save flow.
+
+Tasks now includes a separate lightweight To-do list, with optional due dates, completion, inline editing and manual order. Enable its five-item preview under Dashboard → Edit Dashboard → Add Widget → To-do list. Existing dashboard layouts are retained and the new widget starts hidden.
+
+The only schema change is additive migration `202609080001_todos`, creating `TodoItem` and its index. Existing startup/install migration behaviour applies it; no existing table or academic record is replaced. JSON backup/restore includes To-dos and still accepts older backups. Authentication, timer sync, reminders, Web Push, Windows startup and Tailscale are unchanged. No dependency or Spotify integration is added.
