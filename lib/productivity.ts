@@ -2,9 +2,12 @@ import { z } from 'zod';
 import { db } from './db';
 import { AppError, validateRelations, cleanInput } from './service';
 import { schemaFor } from './validation';
-import { civilNow, addDays, weekday, dayNumber } from './calculations';
+import { civilNow, addDays } from './calculations';
 import { layoutSchema, defaultLayout } from './dashboard-layout';
 import { timerView } from './timer';
+import { nextOccurrence } from './recurrence-description';
+export { nextOccurrence } from './recurrence-description';
+import { announceTimerChange } from './timer-events';
 import { randomUUID } from 'node:crypto';
 const idSchema = z.string().min(1).max(100);
 const optionalId = idSchema.nullish();
@@ -61,22 +64,6 @@ export async function ensurePreferences(userId: string, client: any = db) {
         await client.reminderRule.create({ data: { userId, kind, leadMinutes } });
   }
   return p;
-}
-export function nextOccurrence(r: any, from: string): string | null {
-  for (let i = 0; i <= 366 * 2; i++) {
-    const date = addDays(from, i);
-    if (r.endDate && date > r.endDate) return null;
-    if (date < r.anchor) continue;
-    const offset = dayNumber(date) - dayNumber(r.anchor);
-    if (
-      r.weekdays
-        ? r.weekdays.split(',').includes(String(weekday(date))) &&
-          Math.floor((offset + ((weekday(r.anchor) + 6) % 7)) / 7) % r.weekInterval === 0
-        : offset % r.intervalDays === 0
-    )
-      return date;
-  }
-  return null;
 }
 export async function generateOccurrences(client: any, userId: string, now: string) {
   const rules = await client.recurrence.findMany({
@@ -144,7 +131,7 @@ export async function productivitySnapshot(userId: string) {
   });
 }
 export async function timerAction(userId: string, b: any, now = Date.now()) {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     if (b.action === 'timer.start') {
       const input = z
         .object({
@@ -292,6 +279,8 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
     } else throw new AppError('Unknown timer action.');
     return tx.studyTimer.update({ where: { id: t.id }, data: changes });
   });
+  announceTimerChange(userId); // Only after the transaction commits successfully.
+  return result;
 }
 export async function productivityAction(userId: string, b: any, now = Date.now()) {
   if (typeof b.action !== 'string') throw new AppError('Choose an action.');
@@ -331,40 +320,6 @@ export async function productivityAction(userId: string, b: any, now = Date.now(
       for (const r of rules) await tx.reminderRule.create({ data: { ...r, userId } });
       return;
     }
-    if (b.action === 'plan.save') {
-      const blocks = z
-        .array(
-          z
-            .object({
-              id: z.string().uuid(),
-              name: z.string().min(1).max(500),
-              dueAt: z.string(),
-              minutes: z.number().min(15).max(240),
-              subjectId: optionalId,
-              assignmentId: optionalId,
-              examId: optionalId,
-            })
-            .strict(),
-        )
-        .min(1)
-        .max(8)
-        .parse(b.blocks);
-      for (const block of blocks) {
-        const existing = await tx.studySession.findUnique({ where: { id: block.id } });
-        if (existing) continue;
-        const row: any = schemaFor('studySession').parse(
-          cleanInput('studySession', {
-            ...block,
-            plannedHours: block.minutes / 60,
-            actualHours: 0,
-            completed: false,
-          }),
-        );
-        await validateRelations(tx, 'studySession', row);
-        await tx.studySession.create({ data: { ...row, id: block.id } });
-      }
-      return;
-    }
     if (b.action === 'capture')
       return tx.inboxItem.create({
         data: { userId, name: z.string().trim().min(1).max(500).parse(b.name), createdAt: now },
@@ -380,6 +335,32 @@ export async function productivityAction(userId: string, b: any, now = Date.now(
         await tx.task.create({ data: row });
       }
       await tx.inboxItem.delete({ where: { id: item.id } });
+      return;
+    }
+    if (b.action === 'recurrence.delete') {
+      const series = await tx.recurrence.findFirst({
+        where: { id: idSchema.parse(b.id), userId },
+        include: { occurrences: { include: { task: { include: { timers: true } } } } },
+      });
+      if (!series || series.revision !== b.revision)
+        throw new AppError('Series changed or was deleted. Refresh before deleting.', 409);
+      for (const { task } of series.occurrences) {
+        // Preserve completed, overdue, edited, started or timer-linked work, including history.
+        if (
+          task.status === 'Not Started' &&
+          task.dueAt &&
+          task.dueAt > civil &&
+          task.revision === 0 &&
+          task.actualHours === 0 &&
+          !task.completedAt &&
+          !task.notes &&
+          !task.timers.length
+        ) {
+          await tx.task.delete({ where: { id: task.id } });
+        }
+      }
+      // Cascade removes occurrence links, never the retained Task rows themselves.
+      await tx.recurrence.delete({ where: { id: series.id } });
       return;
     }
     if (b.action === 'recurrence.save') {

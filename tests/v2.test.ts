@@ -10,7 +10,8 @@ import { NextRequest } from 'next/server';
 import { defaults } from '../lib/model';
 import { defaultLayout, moveWidget, layoutSchema } from '../lib/dashboard-layout';
 import { timerView } from '../lib/timer';
-import { suggestDay, weeklyReview } from '../lib/day-plan';
+import { weeklyReview } from '../lib/weekly-review';
+import { hashToken } from '../lib/auth';
 const fixture = mkdtempSync(join(tmpdir(), 'Student V2 fixture ')),
   previous = process.cwd();
 process.env.DATABASE_URL = 'file:' + join(fixture, 'student.db');
@@ -373,40 +374,19 @@ test('Quick Capture organises transactionally into a linked task and cannot conv
     /already organised/,
   );
 });
-test('day planning avoids classes, capacity and duplicate saves; review uses actual submission time', async () => {
-  await db.assignment.update({ where: { id: assignment.id }, data: { status: 'In Progress' } });
-  await saveRow('class', {
-    ...defaults('class'),
-    name: 'Tutorial',
-    subjectId: subject.id,
-    day: 1,
-    startTime: '10:00',
-    endTime: '12:00',
-    startDate: '2026-09-01',
-    endDate: '2026-12-01',
+test('removed automatic planning rejects requests while manual study and Weekly Review remain', async () => {
+  const before = await db.studySession.count();
+  await assert.rejects(act('owner', { action: 'plan.save', blocks: [] }, base), /Unknown/);
+  assert.equal(await db.studySession.count(), before);
+  const manual = await saveRow('studySession', {
+    ...defaults('studySession'),
+    name: 'Manual session',
+    dueAt: '2026-09-07T12:00',
+    plannedHours: 1,
   });
   const d = await snapshot();
-  const plan = suggestDay(d, '2026-09-07', '2026-09-07T09:00');
-  assert.ok(plan.length);
-  assert.ok(
-    plan.every(
-      (b) =>
-        !(
-          b.dueAt < '2026-09-07T12:00' &&
-          new Date(Date.parse(b.dueAt + 'Z') + b.minutes * 60000).toISOString().slice(0, 16) >
-            '2026-09-07T10:00'
-        ),
-    ),
-  );
-  assert.ok(plan.reduce((n, b) => n + b.minutes, 0) <= 180);
-  const blocks = plan.map((b) => ({ ...b, id: randomUUID() }));
-  await act('owner', { action: 'plan.save', blocks }, base);
-  await act('owner', { action: 'plan.save', blocks }, base);
-  assert.equal(
-    await db.studySession.count({ where: { id: { in: blocks.map((b) => b.id) } } }),
-    blocks.length,
-  );
-  assert.equal(weeklyReview(d, '2026-09-07T12:00').submitted, 0);
+  assert.ok(d.studySession.some((s) => s.id === manual.id));
+  assert.ok(weeklyReview(d, '2026-09-07T12:00').planned > 0);
 });
 test('push endpoints reject SSRF and stale subscriptions can be removed without exposing keys', async () => {
   for (const endpoint of [
@@ -544,6 +524,151 @@ test('daily summary is opt-in, configurable, and created once per civil day', as
     await db.notification.count({ where: { dedupeKey: 'owner:summary:2026-09-07' } }),
     1,
   );
+});
+test('deleting recurring series removes only untouched future work and keeps task history', async () => {
+  const series = await db.recurrence.create({
+    data: {
+      userId: 'owner',
+      name: 'Deletion fixture',
+      anchor: '2026-09-07',
+      nextDate: '2026-09-08',
+    },
+  });
+  const preserved: string[] = [];
+  let untouched = '';
+  for (const [index, extra] of [
+    {},
+    { status: 'Completed', completedAt: '2026-09-07T09:00' },
+    { dueAt: '2026-09-06T10:00' },
+    { revision: 1 },
+    { status: 'In Progress' },
+    { actualHours: 0.25 },
+    { notes: 'Keep my notes' },
+    { name: 'Timer-linked' },
+  ].entries()) {
+    const t = await db.task.create({
+      data: { name: 'Generated task', dueAt: '2026-09-08T17:00', ...extra },
+    });
+    await db.taskOccurrence.create({
+      data: {
+        recurrenceId: series.id,
+        taskId: t.id,
+        date: `2026-09-${String(8 + index).padStart(2, '0')}`,
+      },
+    });
+    if (index === 0) untouched = t.id;
+    else preserved.push(t.id);
+    if (extra.name)
+      await db.studyTimer.create({
+        data: {
+          userId: 'owner',
+          name: 'Past study',
+          mode: 'stopwatch',
+          startedAt: base,
+          status: 'saved',
+          taskId: t.id,
+        },
+      });
+  }
+  await assert.rejects(
+    act('other-user', { action: 'recurrence.delete', id: series.id, revision: 0 }, base),
+    /changed/,
+  );
+  await assert.rejects(
+    act('owner', { action: 'recurrence.delete', id: series.id, revision: 1 }, base),
+    /changed/,
+  );
+  assert.ok(await db.task.findUnique({ where: { id: untouched } }));
+  await act('owner', { action: 'recurrence.delete', id: series.id, revision: 0 }, base);
+  assert.equal(await db.recurrence.count({ where: { id: series.id } }), 0);
+  assert.equal(await db.taskOccurrence.count({ where: { recurrenceId: series.id } }), 0);
+  assert.equal(await db.task.count({ where: { id: untouched } }), 0);
+  assert.equal(await db.task.count({ where: { id: { in: preserved } } }), preserved.length);
+  assert.equal(
+    (await db.task.findUniqueOrThrow({ where: { id: preserved[0] } })).status,
+    'Completed',
+  );
+  await reconcileReminders('owner', base + 86400000 * 30);
+  assert.equal(await db.recurrence.count({ where: { id: series.id } }), 0);
+  assert.equal(await db.task.count({ where: { name: 'Deletion fixture' } }), 0);
+});
+test('two authenticated timer clients receive start/pause/resume/finish/cancel immediately and reject stale actions', async () => {
+  const timerApi = await import('../app/api/timer/route');
+  assert.equal(
+    (await timerApi.GET(new NextRequest('http://localhost:3000/api/timer'))).status,
+    401,
+  );
+  const token = 'test-timer-sync-token';
+  await db.session.create({
+    data: { id: hashToken(token), userId: 'owner', expiresAt: Date.now() + 60000 },
+  });
+  const headers = { cookie: 'student_session=' + token };
+  let current: any = null;
+  for (const action of [
+    'timer.start',
+    'timer.pause',
+    'timer.resume',
+    'timer.finish',
+    'timer.cancel',
+  ]) {
+    const cursor = current ? `${current.id}:${current.revision}` : 'none';
+    const req = () =>
+      new NextRequest('http://localhost:3000/api/timer?cursor=' + encodeURIComponent(cursor), {
+        headers,
+      });
+    let completed = false;
+    const response = timerApi.GET(req()).then((r) => {
+      completed = true;
+      return r;
+    });
+    const second = timerApi.GET(req());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(completed, false, 'unchanged timer holds the request instead of polling');
+    const started = Date.now();
+    const old = current;
+    const result = await timerAction(
+      'owner',
+      action === 'timer.start'
+        ? {
+            action,
+            timer: {
+              requestId: randomUUID(),
+              name: 'Cross-device fixture',
+              mode: 'stopwatch',
+              focusMinutes: 50,
+              breakMinutes: 10,
+              rounds: 1,
+            },
+          }
+        : { action, id: current.id, revision: current.revision },
+    );
+    const [a, b] = await Promise.all([
+      response.then((r) => r.json()),
+      second.then((r) => r.json()),
+    ]);
+    assert.ok(
+      Date.now() - started < 2000,
+      'both clients see the committed transition within two seconds',
+    );
+    assert.deepEqual(a.timer, b.timer);
+    current = a.timer;
+    if (action === 'timer.cancel') assert.equal(current, null);
+    else assert.equal(current.revision, result.revision);
+    if (old && action !== 'timer.cancel')
+      await assert.rejects(
+        timerAction('owner', { action: 'timer.pause', id: old.id, revision: old.revision }),
+        /changed/,
+      );
+  }
+  // Logout while a request is held must not release private timer data.
+  const pending = timerApi.GET(
+    new NextRequest('http://localhost:3000/api/timer?cursor=none', { headers }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await db.session.delete({ where: { id: hashToken(token) } });
+  const { announceTimerChange } = await import('../lib/timer-events');
+  announceTimerChange('owner');
+  assert.equal((await pending).status, 401);
 });
 test('V2 JSON backup round-trips new relational state and V1 still imports without touching auth', async () => {
   const backup = await exportBackup();

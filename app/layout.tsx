@@ -7,7 +7,12 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Study' },
   icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#17234b' };
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#17234b',
+  viewportFit: 'cover',
+};
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU" suppressHydrationWarning>

@@ -1,6 +1,6 @@
 // Disposable UI fixture. This is bundled only by scripts/visual-fixture.mjs, never an app route.
 // No authentication code or private database is used, and no production API is mocked.
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppContext } from '../components/context';
 import { Dashboard } from '../components/Dashboard';
@@ -13,6 +13,9 @@ import { NotificationCentre } from '../components/Notifications';
 import { WeeklyReview } from '../components/DailyPlanning';
 import { Editor } from '../components/Editor';
 import { defaultLayout } from '../lib/dashboard-layout';
+import { AppSidebar, BottomNavigation } from '../components/AppNavigation';
+import { useAppFullscreen } from '../components/useAppFullscreen';
+import { readSidebarPreference, saveSidebarPreference } from '../lib/navigation-preference';
 import { defaults, entities, type Data } from '../lib/model';
 const date = '2026-09-07T09:00';
 const row = (entity: any, id: string, extra: any) => ({
@@ -132,7 +135,26 @@ d.productivity = {
   rules: [],
   timer: null,
   inbox: [{ id: 'capture', name: 'Prepare questions for the tutorial' }],
-  recurrences: [],
+  recurrences: [
+    {
+      id: 'series',
+      revision: 0,
+      name: 'Weekly tutorial review',
+      weekdays: '',
+      weekInterval: 1,
+      intervalDays: 7,
+      enabled: true,
+      anchor: '2026-09-07',
+      nextDate: '2026-09-14',
+      time: '17:00',
+      subjectId: 'security',
+      assignmentId: null,
+      estimatedHours: 1,
+      priority: 'Medium',
+      endDate: null,
+      occurrences: [],
+    },
+  ],
   notifications: [
     {
       id: 'notice',
@@ -148,6 +170,18 @@ d.productivity = {
   pushPublicKey: null,
 };
 function Harness() {
+  const fullscreen = useAppFullscreen();
+  const [collapsed, setCollapsed] = useState(false),
+    [menu, setMenu] = useState(false),
+    [density, setDensity] = useState('Comfortable');
+  useEffect(() => {
+    setCollapsed(readSidebarPreference(localStorage, window.innerWidth <= 1150));
+  }, []);
+  function toggleSidebar() {
+    setCollapsed(!collapsed);
+    saveSidebarPreference(localStorage, !collapsed);
+  }
+
   const [route, go] = useState('Dashboard'),
     [editor, open] = useState<any>(null),
     [empty, setEmpty] = useState(false),
@@ -241,6 +275,13 @@ function Harness() {
       >
         <nav className="fixture-nav">
           <label>
+            Density
+            <select value={density} onChange={(e) => setDensity(e.target.value)}>
+              <option>Comfortable</option>
+              <option>Compact</option>
+            </select>
+          </label>
+          <label>
             Screen
             <select value={route} onChange={(e) => go(e.target.value)}>
               {Object.keys(pages).map((x) => (
@@ -262,8 +303,68 @@ function Harness() {
           </label>
           <button onClick={() => open({ entity: 'assignment' })}>New assignment</button>
         </nav>
-        <main style={{ maxWidth: 1250, margin: 'auto', padding: '24px' }}>{pages[route]}</main>
-        {timer && route !== 'Focus' && <MiniTimer />}
+        <div
+          className={
+            'app-shell ' +
+            (collapsed ? 'sidebar-collapsed ' : '') +
+            (fullscreen.active ? 'distraction-free ' : '') +
+            (route === 'Focus' ? 'focus-shell' : '')
+          }
+          data-density={density}
+        >
+          {menu && !fullscreen.active && (
+            <button
+              className="sidebar-scrim"
+              aria-label="Close navigation"
+              onClick={() => setMenu(false)}
+            />
+          )}
+          <AppSidebar
+            route={route.toLowerCase()}
+            menu={menu}
+            collapsed={collapsed}
+            toggleSidebar={toggleSidebar}
+            onSignOut={() => notify('Fixture only')}
+          />
+          <div className="main-shell">
+            {fullscreen.active ? (
+              <div className="fullscreen-controls">
+                <button className="button secondary" onClick={fullscreen.exit}>
+                  Exit Full Screen
+                </button>
+              </div>
+            ) : (
+              <header className="topbar">
+                <button className="button secondary" onClick={fullscreen.enter}>
+                  Enter Full Screen
+                </button>
+                <button
+                  className="icon-button mobile-menu"
+                  aria-label="Open navigation"
+                  onClick={() => setMenu(!menu)}
+                >
+                  Menu
+                </button>
+              </header>
+            )}
+            <main id="main" tabIndex={-1}>
+              {pages[route]}
+            </main>
+            {timer && route !== 'Focus' && (
+              <div className="timer-dock">
+                <MiniTimer />
+              </div>
+            )}
+          </div>
+        </div>
+        {!fullscreen.active && route !== 'Focus' && (
+          <BottomNavigation
+            route={route.toLowerCase()}
+            menu={menu}
+            toggleMenu={() => setMenu(!menu)}
+            toggleQuick={() => notify('Quick capture fixture')}
+          />
+        )}
         {editor && <Editor editor={editor} close={() => open(null)} />}
         <p role="status">{toast}</p>
       </div>

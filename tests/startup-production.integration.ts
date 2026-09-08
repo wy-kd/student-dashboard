@@ -100,6 +100,15 @@ test(
           'server scheduler creates persisted reminders without a browser',
         );
         if (cycle === 0) {
+          let idleReplied = false;
+          const idleObserver = fetch('http://127.0.0.1:3000/api/timer?cursor=none', {
+            headers,
+          }).then((r) => {
+            idleReplied = true;
+            return r;
+          });
+          await new Promise((done) => setTimeout(done, 100));
+          assert.equal(idleReplied, false, 'idle production request waits for a transition');
           let response = await fetch('http://127.0.0.1:3000/api/productivity', {
             method: 'POST',
             headers,
@@ -116,19 +125,49 @@ test(
             }),
           });
           assert.equal(response.status, 200);
+          const started = await (await idleObserver).json();
+          assert.equal(started.timer.status, 'running', 'idle second client sees a remote start');
+          const observePause = fetch(
+            'http://127.0.0.1:3000/api/timer?cursor=' + encodeURIComponent(started.cursor),
+            { headers },
+          );
+          await new Promise((done) => setTimeout(done, 100));
+          const changedAt = Date.now();
           response = await fetch('http://127.0.0.1:3000/api/productivity', {
             method: 'POST',
             headers,
             body: JSON.stringify({ action: 'timer.pause', id: timerId, revision: 0 }),
           });
           assert.equal(response.status, 200);
+          const paused = await (await observePause).json();
+          assert.equal(paused.timer.status, 'paused');
+          assert.ok(
+            Date.now() - changedAt < 2000,
+            'production cross-client pause arrives within two seconds',
+          );
         } else {
           assert.equal(productivity.timer.id, timerId);
           assert.equal(productivity.timer.status, 'paused');
         }
 
+        // A connected visible client must not prevent safe maintenance shutdown.
+        const watching = fetch(
+          'http://127.0.0.1:3000/api/timer?cursor=' + encodeURIComponent(timerId + ':1'),
+          { headers },
+        )
+          .then(async (r) => {
+            await r.arrayBuffer();
+            return r.status;
+          })
+          .catch(() => null);
+        await new Promise((done) => setTimeout(done, 100));
         const stop = await command(root, 'stop');
-        assert.equal(stop.code, 0, stop.output);
+        const waitingStatus = await watching;
+        assert.ok(
+          waitingStatus === 503 || waitingStatus === null,
+          'waiting timer connection closes during shutdown',
+        );
+        assert.equal(stop.code, 0, stop.output + '\n' + active.output());
         assert.equal(await active.exited, 143, 'Next production shutdown completes');
       }
       const saved = new DatabaseSync(join(root, 'data/student.db'));

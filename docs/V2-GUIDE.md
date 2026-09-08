@@ -1,5 +1,7 @@
 # Student Dashboard V2
 
+For the latest usability changes and update checklist, see [V2.1 polish](V2.1-GUIDE.md).
+
 V2 keeps the local production architecture and focuses daily work on Today, recommendations and a study timer. No Tailscale, Task Scheduler, firewall or router changes are required.
 
 ## Everyday use
@@ -11,12 +13,12 @@ V2 keeps the local production architecture and focuses daily work on Today, reco
 - **Completion:** Finish opens a short review with actual minutes, an optional note and an optional linked-task completion checkbox. Save creates exactly one StudySession. Start again from the timer after saving. Timer hours do not also increment manual task/assignment hours. Do not manually log the same time again.
 - **Quick Capture / Inbox:** the Add menu accepts a short thought with no required category or date. Organise it in Inbox into a normal task, with optional subject, assignment, deadline and priority. Quick Add remains available for structured creation.
 - **Recurring tasks:** Tasks → Recurring tasks. Daily, weekly, fortnightly, selected weekdays or a custom day/week interval. One outstanding occurrence per series, up to fourteen days ahead. An overdue unfinished occurrence remains; a restart does not generate a backlog. Completed tasks retain their history. The normal task editor changes that occurrence. The series editor changes future occurrences and can pause generation; it does not rewrite existing tasks.
-- **Today:** classes, study, due/overdue tasks, recommendations and available study capacity. Plan My Day produces editable proposals around existing classes and study, within daily capacity and 09:00–21:00. Review start times and durations before accepting. Ten-minute gaps separate proposals. Acceptance is transactional and retry-safe. Suggestions never move existing plans. You can deliberately move proposals or edit saved sessions afterwards.
-- **Weekly Review:** completed tasks, actual study time, submitted assessments and uncompleted past study sessions, followed by next week's assessments and estimated workload. Plan Next Week opens the day planner for next Monday; choose each date you want to plan. V1 assessments have no historical submission timestamp, so they are not retrospectively counted as submitted this week.
+- **Today:** classes, study, due/overdue tasks, recommendations and available study capacity. Schedule sessions manually from a recommendation or Calendar. V2.1 removes the automatic Plan My Day proposals; existing study sessions remain.
+- **Weekly Review:** completed tasks, actual study time, submitted assessments and uncompleted past study sessions, followed by next week's assessments and estimated workload. Next week's assessments and workload remain visible; the automatic Plan Next Week control was removed in V2.1. V1 assessments have no historical submission timestamp, so they are not retrospectively counted as submitted this week.
 
 ## Timer persistence
 
-One active timer per owner is enforced by a unique database key. Start requests have a client-generated unique ID. Pause/resume/finish use revision checks, and completion stores a unique StudySession link so network retries cannot record a session twice. Refresh, navigation and server restart recover the same timer. Devices project elapsed time from server timestamps; no per-second database writes occur. Visible pages use the existing 15-second synchronisation cycle. Temporary disconnection leaves a timestamp projection on screen; mutations require reconnection. Keep the Acer's system clock accurate. A stopwatch continues to measure elapsed time while the browser is closed; check actual minutes before saving (up to 24 hours per saved session).
+One active timer per owner is enforced by a unique database key. Start requests have a client-generated unique ID. Pause/resume/finish use revision checks, and completion stores a unique StudySession link so network retries cannot record a session twice. Refresh, navigation and server restart recover the same timer. Devices project elapsed time from server timestamps; no per-second database writes occur. V2.1 uses a dedicated authenticated long-poll connection for timer transitions, normally within 1–2 seconds on visible connected pages. General records retain the 15-second refresh. Temporary disconnection leaves a timestamp projection on screen; mutations require reconnection. Keep the Acer's system clock accurate. A stopwatch continues to measure elapsed time while the browser is closed; check actual minutes before saving (up to 24 hours per saved session).
 
 ## Reminder scheduling and retention
 

@@ -123,7 +123,7 @@ function WidgetDashboard() {
               <Empty title="Room for focused work" text="Plan a session or start your timer." />
             )}
             <button className="text-button" onClick={() => go('/today')}>
-              Plan today →
+              View Today →
             </button>
           </>
         );

@@ -528,3 +528,10 @@ V2 adds an editable responsive Dashboard, Comfortable/Compact density, a persist
 **Before updating your Acer, follow the exact [V2 update and setup guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer).** It includes backup/stop/update/test/build/start commands, optional local VAPID setup, per-device notification permission steps and the physical reboot/device checklist. Do not build or install while the scheduled app is running.
 
 The scheduler lives inside Next.js and recovers persisted reminders after restart; see [notification architecture and limitations](docs/V2-GUIDE.md#reminder-scheduling-and-retention). No second process, cloud database, public hosting or Tailscale/Task Scheduler configuration change is needed. Portable backups now use version 2 and include V2 academic/productivity state; version 1 imports still work. Passwords, sessions and push secrets stay out of portable JSON exports.
+
+
+## V2.1 usability polish
+
+V2.1 adds a saved collapsible navigation rail, optional full-screen/distraction-free layout, a responsive timer dock and prompt cross-device timer updates. Recurring series have a separate editor and confirmed deletion that preserves completed history. Automatic Plan My Day/Plan Next Week proposals are removed; manual study sessions, Today and Weekly Review remain.
+
+No migration, new dependency, secret or Windows/Tailscale configuration change is required. See [V2.1 behaviour, safe Acer update commands and device checks](docs/V2.1-GUIDE.md).

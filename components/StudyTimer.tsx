@@ -27,6 +27,7 @@ export function StudyTimer({
   const offset = useRef(0);
   useEffect(() => {
     offset.current = (state?.serverNow ?? Date.now()) - Date.now();
+    setClock(Date.now() + offset.current);
   }, [state?.serverNow]);
   useEffect(() => {
     if (!t) return;
@@ -297,9 +298,11 @@ export function MiniTimer() {
   const { state, go, act, notify } = useProductivity(),
     t = state?.timer;
   const [now, setNow] = useState(Date.now());
+  const [busy, setBusy] = useState(false);
   const offset = useRef(0);
   useEffect(() => {
     offset.current = (state?.serverNow ?? Date.now()) - Date.now();
+    setNow(Date.now() + offset.current);
   }, [state?.serverNow]);
   useEffect(() => {
     if (!t) return;
@@ -308,40 +311,58 @@ export function MiniTimer() {
   }, [t?.id]);
   if (!t) return null;
   const v = timerView(t, now);
+  async function run(action: string) {
+    setBusy(true);
+    try {
+      await act(action, { id: t.id, revision: t.revision });
+      if (action === 'timer.finish') go('/study');
+    } catch (e: any) {
+      notify(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <aside className="mini-timer" aria-label="Active study timer">
-      <button onClick={() => go('/focus')}>
-        <strong>{t.name}</strong>
-        <span>
-          {t.status === 'review' ? 'Save session' : clockText(v.remainingMs ?? v.elapsedMs)}
+    <aside className="mini-timer" aria-label="Active study timer" data-state={t.status}>
+      <button className="mini-timer-summary" onClick={() => go('/focus')} title="Open Focus Mode">
+        <span className="mini-timer-title">
+          <strong>{t.name}</strong>
+          <small>
+            {t.status === 'review'
+              ? 'Ready to save'
+              : t.status === 'paused'
+                ? 'Paused'
+                : v.complete
+                  ? 'Round complete'
+                  : t.phase === 'break'
+                    ? 'Break running'
+                    : 'Running'}
+          </small>
         </span>
+        <span className="mini-timer-time">{clockText(v.remainingMs ?? v.elapsedMs)}</span>
       </button>
-      {t.status !== 'review' && (
-        <>
-          <button
-            onClick={() =>
-              act(t.status === 'paused' ? 'timer.resume' : 'timer.pause', {
-                id: t.id,
-                revision: t.revision,
-              }).catch((e: any) => notify(e.message))
-            }
-          >
-            {t.status === 'paused' ? 'Resume' : 'Pause'}
+      <div className="mini-timer-controls">
+        {t.status === 'review' ? (
+          <button className="button primary" onClick={() => go('/study')}>
+            Review & save
           </button>
-          <button
-            onClick={async () => {
-              try {
-                await act('timer.finish', { id: t.id, revision: t.revision });
-                go('/study');
-              } catch (e: any) {
-                notify(e.message);
-              }
-            }}
-          >
-            Finish
-          </button>
-        </>
-      )}
+        ) : (
+          <>
+            {!v.complete && (
+              <button
+                className="button secondary"
+                disabled={busy}
+                onClick={() => run(t.status === 'paused' ? 'timer.resume' : 'timer.pause')}
+              >
+                {t.status === 'paused' ? 'Resume' : 'Pause'}
+              </button>
+            )}
+            <button className="button primary" disabled={busy} onClick={() => run('timer.finish')}>
+              Finish
+            </button>
+          </>
+        )}
+      </div>
     </aside>
   );
 }

@@ -2,31 +2,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard,
   Sun,
-  CheckSquare,
-  Files,
-  CalendarDays,
-  Clock,
   BookOpen,
-  GraduationCap,
-  Headphones,
-  BarChart3,
-  Settings as SettingsIcon,
   Search,
   Plus,
   Menu,
   X,
-  LogOut,
   Moon,
   ArrowRight,
   RefreshCw,
-  Inbox as InboxIcon,
   Bell,
-  CalendarCheck,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import { AppContext, type Editor as EditorType } from './context';
 import { Editor } from './Editor';
+import { AppSidebar, BottomNavigation } from './AppNavigation';
+import { useTimerSync } from './useTimerSync';
+import { useAppFullscreen } from './useAppFullscreen';
+import { readSidebarPreference, saveSidebarPreference } from '@/lib/navigation-preference';
 import { MiniTimer, FocusMode } from './StudyTimer';
 import { Inbox, QuickCapture } from './Inbox';
 import { NotificationCentre } from './Notifications';
@@ -37,23 +31,6 @@ import { Calendar, Study, Grades, Analytics } from './Planning';
 import { Settings } from './Settings';
 import { civilNow } from '@/lib/calculations';
 import { fields, labels, type Data, type Entity, type RecordRow } from '@/lib/model';
-const navigation = [
-  ['', 'Dashboard', LayoutDashboard],
-  ['today', 'Today', Sun],
-  ['tasks', 'Tasks', CheckSquare],
-  ['inbox', 'Inbox', InboxIcon],
-  ['assignments', 'Assignments', Files],
-  ['calendar', 'Calendar', CalendarDays],
-  ['timetable', 'Timetable', Clock],
-  ['subjects', 'Subjects', BookOpen],
-  ['exams', 'Exams', GraduationCap],
-  ['study', 'Study', Headphones],
-  ['grades', 'Grades', GraduationCap],
-  ['analytics', 'Analytics', BarChart3],
-  ['review', 'Weekly Review', CalendarCheck],
-  ['notifications', 'Notifications', Bell],
-  ['settings', 'Settings', SettingsIcon],
-] as const;
 function scopeData(d: Data, id: string): Data {
   if (!id) return d;
   const subjects = d.subject.filter((s) => s.semesterId === id),
@@ -88,6 +65,7 @@ export function Workspace() {
     [toast, setToast] = useState(''),
     [problem, setProblem] = useState(''),
     [menu, setMenu] = useState(false),
+    [collapsed, setCollapsed] = useState(false),
     [quick, setQuick] = useState(false),
     [query, setQuery] = useState(''),
     [dark, setDark] = useState(false),
@@ -98,22 +76,42 @@ export function Workspace() {
     [busy, setBusy] = useState(false);
   const [route, id] = pathname.split('/').slice(1);
   const notify = useCallback((s: string) => setToast(s), []);
-  const reload = useCallback(async () => {
-    const res = await fetch('/api/data', { cache: 'no-store' });
-    const body = await res.json();
-    if (res.status === 401) {
-      setAuth({ setup: false, signedIn: false });
-      setData(null);
-      return;
-    }
-    if (!res.ok) throw Error(body.error);
-    const productivity = await fetch('/api/productivity', { cache: 'no-store' });
-    if (!productivity.ok)
-      throw Error('Could not load your timer and notifications. Retry connection.');
-    body.productivity = await productivity.json();
-    setData(body);
-    setProblem('');
+  const fullscreen = useAppFullscreen();
+  const signedOut = useCallback(() => {
+    setAuth({ setup: false, signedIn: false });
+    setData(null);
   }, []);
+  const timerSync = useTimerSync(!!auth?.signedIn, signedOut);
+  useEffect(() => {
+    setCollapsed(
+      readSidebarPreference(localStorage, window.matchMedia('(max-width: 1150px)').matches),
+    );
+  }, []);
+  function toggleSidebar() {
+    const next = !collapsed;
+    setCollapsed(next);
+    saveSidebarPreference(localStorage, next);
+  }
+  const reload = useCallback(
+    async (refreshTimer = true) => {
+      const res = await fetch('/api/data', { cache: 'no-store' });
+      const body = await res.json();
+      if (res.status === 401) {
+        setAuth({ setup: false, signedIn: false });
+        setData(null);
+        return;
+      }
+      if (!res.ok) throw Error(body.error);
+      const productivity = await fetch('/api/productivity', { cache: 'no-store' });
+      if (!productivity.ok)
+        throw Error('Could not load your timer and notifications. Retry connection.');
+      body.productivity = await productivity.json();
+      setData(body);
+      if (refreshTimer) timerSync.refresh();
+      setProblem('');
+    },
+    [timerSync.refresh],
+  );
   const check = useCallback(async () => {
     try {
       const r = await fetch('/api/auth', { cache: 'no-store' });
@@ -142,7 +140,7 @@ export function Workspace() {
     const refresh = () => {
       setTick((t) => t + 1);
       if (document.visibilityState === 'visible')
-        reload().catch(() =>
+        reload(false).catch(() =>
           setProblem(
             'Cannot reach the laptop. Your last loaded data is shown. Reconnect before making changes.',
           ),
@@ -223,7 +221,7 @@ export function Workspace() {
         <h1>Student Dashboard</h1>
         <p>{problem || 'Opening your workspace…'}</p>
         {problem && (
-          <button className="button primary" onClick={check}>
+          <button className="button primary" onClick={() => check()}>
             Retry connection
           </button>
         )}
@@ -298,7 +296,17 @@ export function Workspace() {
         </form>
       </main>
     );
-  const allData = data!,
+  const allData =
+      timerSync.snapshot && data?.productivity
+        ? ({
+            ...data,
+            productivity: {
+              ...data.productivity,
+              timer: timerSync.snapshot.timer,
+              serverNow: timerSync.snapshot.serverNow,
+            },
+          } as Data)
+        : data!,
     semesterId = selected ?? data!.setting.activeSemesterId ?? '',
     scoped = scopeData(allData, semesterId),
     now = civilNow(allData.setting.timezone);
@@ -384,77 +392,63 @@ export function Workspace() {
         Skip to content
       </a>
       <div
-        className={'app-shell ' + (route === 'focus' ? 'focus-shell' : '')}
+        className={
+          'app-shell ' +
+          (route === 'focus' ? 'focus-shell ' : '') +
+          (collapsed ? 'sidebar-collapsed ' : '') +
+          (fullscreen.active ? 'distraction-free' : '')
+        }
         data-density={allData.productivity?.preference?.density ?? 'Comfortable'}
       >
-        {menu && (
+        {menu && !fullscreen.active && route !== 'focus' && (
           <button
             className="sidebar-scrim"
             aria-label="Close navigation"
             onClick={() => setMenu(false)}
           />
         )}
-        <aside className={'sidebar ' + (menu ? 'open' : '')}>
-          <button className="brand" onClick={() => go('/')}>
-            <span>
-              <BookOpen size={23} />
-            </span>
-            Study<span className="brand-dot">.</span>
-          </button>
-          <div className="workspace-label">STUDENT WORKSPACE</div>
-          <nav aria-label="Main navigation">
-            {navigation.map(([url, label, Icon]) => (
-              <a
-                key={url}
-                href={'/' + url}
-                onClick={(e) => {
-                  e.preventDefault();
-                  go('/' + url);
-                }}
-                className={
-                  (route === url ? 'active ' : '') +
-                  (['assignments', 'review', 'settings'].includes(url) ? 'nav-divider' : '')
-                }
-                aria-current={route === url ? 'page' : undefined}
-              >
-                <Icon size={19} />
-                <span>{label}</span>
-                {url === 'tasks' && (
-                  <small>{scoped.task.filter((t) => t.status !== 'Completed').length}</small>
-                )}
-              </a>
-            ))}
-          </nav>
-          <div className="sidebar-bottom">
-            <div className="avatar">{allData.setting.name.slice(0, 1).toUpperCase()}</div>
-            <div className="grow">
-              <strong>{allData.setting.name}</strong>
-              <small>Personal workspace</small>
+        <AppSidebar
+          route={route}
+          menu={menu}
+          collapsed={collapsed}
+          toggleSidebar={toggleSidebar}
+          onSignOut={async () => {
+            try {
+              const r = await fetch('/api/auth', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+              });
+              if (!r.ok) throw Error('Could not sign out. Please try again.');
+              setData(null);
+              await check();
+            } catch (e: any) {
+              notify(e.message);
+            }
+          }}
+        />
+        <div className="main-shell">
+          {fullscreen.active && (
+            <div className="fullscreen-controls">
+              <button className="button secondary" onClick={fullscreen.exit}>
+                <Minimize size={18} />
+                Exit Full Screen
+              </button>
             </div>
+          )}
+          <header className="topbar">
             <button
-              className="icon-button"
-              aria-label="Sign out"
-              onClick={async () => {
-                try {
-                  const r = await fetch('/api/auth', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: '{}',
-                  });
-                  if (!r.ok) throw Error('Could not sign out. Please try again.');
-                  setData(null);
-                  await check();
-                } catch (e: any) {
-                  notify(e.message);
-                }
+              className="icon-button fullscreen-enter"
+              title="Full screen"
+              aria-label="Enter Full Screen"
+              onClick={() => {
+                setMenu(false);
+                setQuick(false);
+                void fullscreen.enter();
               }}
             >
-              <LogOut size={18} />
+              <Maximize size={20} />
             </button>
-          </div>
-        </aside>
-        <div className="main-shell">
-          <header className="topbar">
             <button
               className="icon-button notification-bell"
               aria-label={
@@ -587,9 +581,9 @@ export function Workspace() {
             </div>
           </header>
           <main id="main" key={pathname} tabIndex={-1}>
-            {problem && (
+            {(problem || timerSync.error) && (
               <div role="alert" className="error inline">
-                {problem}
+                {problem || timerSync.error}
                 <button
                   className="text-button"
                   onClick={() => reload().catch((e) => notify(e.message))}
@@ -618,45 +612,24 @@ export function Workspace() {
             </div>
             {page}
             <footer className="workspace-footer">
-              Your workspace · {allData.setting.timezone} · Synced with this laptop every 15 seconds
+              Your workspace · {allData.setting.timezone} · Connected to your laptop
             </footer>
           </main>
+          {route !== 'focus' && (
+            <div className="timer-dock">
+              <MiniTimer />
+            </div>
+          )}
         </div>
       </div>
-      {route !== 'focus' && (
+      {route !== 'focus' && !fullscreen.active && (
         <>
-          <nav className="bottom-nav" aria-label="Mobile navigation">
-            <button
-              onClick={() => go('/today')}
-              aria-current={route === 'today' ? 'page' : undefined}
-            >
-              <Sun size={20} />
-              Today
-            </button>
-            <button
-              onClick={() => go('/tasks')}
-              aria-current={route === 'tasks' ? 'page' : undefined}
-            >
-              <CheckSquare size={20} />
-              Tasks
-            </button>
-            <button aria-label="Quick Capture and Quick Add" onClick={() => setQuick(!quick)}>
-              <Plus size={24} />
-              Add
-            </button>
-            <button
-              onClick={() => go('/calendar')}
-              aria-current={route === 'calendar' ? 'page' : undefined}
-            >
-              <CalendarDays size={20} />
-              Calendar
-            </button>
-            <button onClick={() => setMenu(!menu)} aria-expanded={menu}>
-              <Menu size={20} />
-              More
-            </button>
-          </nav>
-          <MiniTimer />
+          <BottomNavigation
+            route={route}
+            menu={menu}
+            toggleMenu={() => setMenu(!menu)}
+            toggleQuick={() => setQuick(!quick)}
+          />
         </>
       )}
       {editor && (

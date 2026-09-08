@@ -1,107 +1,8 @@
 'use client';
-import { useState } from 'react';
 import { useApp } from './context';
-import { useProductivity } from './productivity';
 import { Section, Empty, TaskRow } from './ui';
 import { calendarEvents, priorities } from '@/lib/calculations';
-import { suggestDay, weeklyReview, type StudyBlock } from '@/lib/day-plan';
-export function DayPlanner({ initialDay }: { initialDay?: string }) {
-  const { data: d, now, act, notify } = useProductivity(),
-    [day, setDay] = useState(initialDay ?? now.slice(0, 10)),
-    [blocks, setBlocks] = useState<StudyBlock[] | null>(null),
-    [busy, setBusy] = useState(false);
-  const edit = (id: string, patch: Partial<StudyBlock>) =>
-    setBlocks((b) => b!.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  async function accept() {
-    setBusy(true);
-    try {
-      await act('plan.save', { blocks });
-      setBlocks(null);
-      notify('Study plan saved. Edit sessions in Calendar.');
-    } catch (e: any) {
-      notify(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="day-planner">
-      <div className="inline">
-        <label>
-          Plan date{' '}
-          <input
-            type="date"
-            value={day}
-            onChange={(e) => {
-              setDay(e.target.value);
-              setBlocks(null);
-            }}
-          />
-        </label>
-        <button
-          className="button primary"
-          disabled={!day || busy}
-          onClick={() =>
-            setBlocks(suggestDay(d, day, now).map((b) => ({ ...b, id: crypto.randomUUID() })))
-          }
-        >
-          Plan My Day
-        </button>
-      </div>
-      {blocks && (
-        <div className="plan-proposals">
-          <p>
-            Suggestions use deadlines, weighting and work remaining, around existing classes and
-            study. Review before saving.
-          </p>
-          {blocks.map((b) => (
-            <div className="proposal" key={b.id}>
-              <strong>{b.name}</strong>
-              <label>
-                Start
-                <input
-                  aria-label={'Start ' + b.name}
-                  type="datetime-local"
-                  value={b.dueAt}
-                  onChange={(e) => edit(b.id, { dueAt: e.target.value })}
-                />
-              </label>
-              <label>
-                Minutes
-                <input
-                  aria-label={'Minutes ' + b.name}
-                  type="number"
-                  min={15}
-                  max={240}
-                  value={b.minutes}
-                  onChange={(e) => edit(b.id, { minutes: Number(e.target.value) })}
-                />
-              </label>
-              <button
-                className="text-button"
-                onClick={() => setBlocks((x) => x!.filter((y) => y.id !== b.id))}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          {!blocks.length ? (
-            <p>
-              No blocks to suggest. Check your free time, capacity and remaining assessment work.
-            </p>
-          ) : (
-            <button className="button primary" disabled={busy} onClick={accept}>
-              {busy ? 'Saving…' : 'Accept study plan'}
-            </button>
-          )}
-          <button className="text-button" disabled={busy} onClick={() => setBlocks(null)}>
-            Close suggestions
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+import { weeklyReview } from '@/lib/weekly-review';
 export function Today() {
   const { data: d, now, open } = useApp(),
     today = now.slice(0, 10),
@@ -124,7 +25,6 @@ export function Today() {
           </p>
         </div>
       </div>
-      <DayPlanner />
       <div className="two-columns">
         <Section title="Classes & study">
           {schedule.map((e) => (
@@ -220,10 +120,6 @@ export function WeeklySummary({ compact = false }: { compact?: boolean }) {
               {r.dueAt.slice(0, 10)} · {r.name}
             </p>
           ))}
-          <details className="more-fields">
-            <summary>Plan Next Week</summary>
-            <DayPlanner initialDay={w.next} />
-          </details>
         </>
       )}
       {compact && (
