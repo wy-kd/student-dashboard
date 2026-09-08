@@ -1,5 +1,8 @@
 'use client';
+import { DateTimeInput } from './DateTimeInput';
+import { formatDate, formatTime } from '@/lib/format';
 import { useState } from 'react';
+import { SemesterWeek } from './SemesterWeek';
 import { StudyTimer } from './StudyTimer';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useApp } from './context';
@@ -33,7 +36,7 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
   const count = view === 'Month' ? 42 : view === 'Week' ? 7 : 1;
   const days = Array.from({ length: count }, (_, i) => addDays(start, i));
   const events = calendarEvents(d, start, days.at(-1)!).filter(
-    (e) => !timetable || e.entity === 'class' || e.entity === 'studySession',
+    (e) => !timetable || e.entity === 'class' || e.entity === 'studySession' || e.kind === 'Break',
   );
   const move = (n: number) => {
     if (view === 'Month') {
@@ -79,7 +82,8 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
             </button>
           ))}
         </div>
-        <input
+        <DateTimeInput
+          autoComplete="off"
           aria-label="Go to date"
           type="date"
           value={anchor}
@@ -106,7 +110,9 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
             >
               <button
                 className="day-label"
-                aria-label={'Add ' + (timetable ? 'study session' : 'task') + ' on ' + day}
+                aria-label={
+                  'Add ' + (timetable ? 'study session' : 'task') + ' on ' + formatDate(day)
+                }
                 onClick={() =>
                   open({
                     entity: timetable ? 'studySession' : 'task',
@@ -117,12 +123,15 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
                 <span>
                   {new Date(day + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' })}
                 </span>
-                <b>{Number(day.slice(8))}</b>
+                <b>{view === 'Month' ? Number(day.slice(8)) : formatDate(day)}</b>
               </button>
               {daily.map((e, i) => (
                 <button
                   key={e.id + e.kind + i}
-                  className={'calendar-event ' + (e.entity === 'exam' ? 'exam-event' : '')}
+                  className={
+                    'calendar-event ' +
+                    (e.entity === 'exam' ? 'exam-event' : e.kind === 'Break' ? 'break-event' : '')
+                  }
                   style={{
                     borderLeftColor:
                       d.subject.find((s) => s.id === e.subjectId)?.color ?? '#8290a8',
@@ -135,8 +144,12 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
                   }
                 >
                   <span>
-                    {e.start.slice(11)}
-                    {e.end?.includes('T') ? '–' + e.end.slice(11) : ''} · {e.kind}
+                    {e.kind === 'Break'
+                      ? 'Semester Break'
+                      : formatTime(e.start) +
+                        (e.end?.includes('T') ? '–' + formatTime(e.end) : '') +
+                        ' · ' +
+                        e.kind}
                   </span>
                   <strong>{e.name}</strong>
                   {view !== 'Month' && (
@@ -272,6 +285,7 @@ export function Grades() {
           <label className="target-input">
             Target overall percentage
             <input
+              autoComplete="off"
               aria-label="Target overall percentage"
               type="number"
               min={0}
@@ -458,7 +472,7 @@ export function Analytics() {
             <div
               key={b.date}
               className="workload-column"
-              title={`${b.date}: ${b.hours} hours, ${b.deadlines} deadlines`}
+              title={`${formatDate(b.date)}: ${b.hours} hours, ${b.deadlines} deadlines`}
             >
               <span>{b.hours}</span>
               <div>
@@ -477,8 +491,8 @@ export function Analytics() {
         </p>
         {f.collisions.map((c) => (
           <p className="notice" key={c.start}>
-            Heavy workload {c.start}–{c.end}: {c.count} assessments, {c.weight}% combined weighting,{' '}
-            {c.hours}h of work.
+            Heavy workload {formatDate(c.start)}–{formatDate(c.end)}: {c.count} assessments,{' '}
+            {c.weight}% combined weighting, {c.hours}h of work.
           </p>
         ))}
         {!f.collisions.length && (
@@ -491,6 +505,7 @@ export function Analytics() {
           return (
             <div className="progress-row" key={s.id}>
               <strong>{s.name}</strong>
+              <SemesterWeek semester={s} now={now} data={d} />
               <Progress value={p.percent} label="Elapsed" />
               <p className="muted">
                 {p.completed} assignments submitted · {p.total - p.completed} remaining ·{' '}
@@ -514,7 +529,7 @@ export function Analytics() {
             <tbody>
               {weekly.map((w) => (
                 <tr key={w.start}>
-                  <td>{w.start}</td>
+                  <td>{formatDate(w.start)}</td>
                   <td>{w.hours}h</td>
                   <td>{w.tasks}</td>
                 </tr>

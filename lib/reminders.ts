@@ -1,3 +1,4 @@
+import { formatDateTime } from './format';
 import { createHash } from 'node:crypto';
 import { db } from './db';
 import { snapshot } from './service';
@@ -103,7 +104,7 @@ export async function reconcileReminders(userId: string, now = Date.now()) {
                     ? 'Task'
                     : 'Study',
             title: info.name,
-            message: (r.kind === 'studySession' ? 'Starts ' : 'Due ') + r.dueAt.replace('T', ' · '),
+            message: (r.kind === 'studySession' ? 'Starts ' : 'Due ') + formatDateTime(r.dueAt),
             createdAt: now,
           },
           update: {},

@@ -1,4 +1,5 @@
 'use client';
+import { formatDate, formatTime } from '@/lib/format';
 import { Pencil, Trash2, Plus, ArrowUpRight, Check } from 'lucide-react';
 import { useApp, subjectName } from './context';
 import { fields, type Entity, type RecordRow } from '@/lib/model';
@@ -129,6 +130,7 @@ export function TaskRow({ row }: { row: RecordRow }) {
   return (
     <div className={'task-row ' + (completed ? 'is-done' : '')}>
       <input
+        autoComplete="off"
         aria-label={'Complete ' + row.name}
         type="checkbox"
         checked={completed}
@@ -182,7 +184,7 @@ export function AssessmentCard({ row, exam = false }: { row: RecordRow; exam?: b
       <details className="more-fields">
         <summary>Details & status</summary>
         <p className="muted">
-          {row.dueAt.slice(0, 10)} · {row.dueAt.slice(11)}
+          {formatDate(row.dueAt)} · {formatTime(row.dueAt)}
           {exam ? ' · ' + row.location : ''}
         </p>
         <div className="card-bottom">

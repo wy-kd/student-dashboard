@@ -541,3 +541,9 @@ No migration, new dependency, secret or Windows/Tailscale configuration change i
 Use the [V2.1.1 Acer update and verification guide](docs/V2.1.1-GUIDE.md). This release keeps one saved sidebar controller, removes application fullscreen while retaining Study Focus Mode and PWA standalone access, gives the timer a separate activity/status/clock hierarchy and separates recurring-series management from ordinary task filtering.
 
 An incremental production build reproduced stale CSS after source edits. Production builds now disable the persistent Turbopack build cache, and `npm run build` checks the emitted CSS before succeeding. This affects installation/update builds only; Windows startup still starts the existing production build without rebuilding. No database migration, new dependency or Windows/Tailscale change is included.
+
+## V2.1.2 usability and semester management
+
+**Back up your real university data before updating.** Follow the [V2.1.2 backup, verification, Acer update and exact recovery guide](docs/V2.1.2-GUIDE.md). It includes a dated full `data`/`.env` copy outside the repository, JSON verification, Settings/CLI JSON restore and full database/environment recovery.
+
+This release adds consistent Australian date/time display, readable Dashboard edit controls, native-input format hints, ordinary-field autocomplete suppression, teaching-week states, Semester Break management using existing records and a compact floating timer with End → review. No database migration, seed/reset, new dependency or Windows/Tailscale/authentication/timer-sync architecture change is required.

@@ -1,4 +1,6 @@
 'use client';
+import { SemesterBreaks } from './SemesterBreaks';
+import { DateTimeInput } from './DateTimeInput';
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { defaults, fields, labels, type Entity, type RecordRow } from '@/lib/model';
@@ -41,6 +43,9 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
     }
   }
   function control(f: (typeof fields)[Entity][number]) {
+    const Input = ['date', 'time', 'datetime-local'].includes(f.type ?? '')
+      ? DateTimeInput
+      : 'input';
     const val = values[f.key] ?? '';
     const id = 'field-' + f.key;
     const change = (v: any) =>
@@ -65,6 +70,7 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
         </span>
         {f.type === 'textarea' ? (
           <textarea
+            autoComplete="off"
             id={id}
             value={val}
             onChange={(e) => change(e.target.value)}
@@ -98,13 +104,15 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
           </select>
         ) : f.type === 'checkbox' ? (
           <input
+            autoComplete="off"
             id={id}
             type="checkbox"
             checked={Boolean(val)}
             onChange={(e) => change(e.target.checked)}
           />
         ) : (
-          <input
+          <Input
+            autoComplete="off"
             id={id}
             type={f.type ?? 'text'}
             value={val}
@@ -204,6 +212,7 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
           </button>
         </div>
       </form>
+      {entity === 'semester' && row && <SemesterBreaks semester={row} />}
     </dialog>
   );
 }

@@ -1,4 +1,5 @@
 'use client';
+import { DateTimeInput } from './DateTimeInput';
 import { useState } from 'react';
 import { useProductivity } from './productivity';
 import { Section, Empty } from './ui';
@@ -26,6 +27,7 @@ export function QuickCapture() {
       <label className="field">
         Quick Capture
         <input
+          autoComplete="off"
           placeholder="What do you need to remember?"
           maxLength={500}
           required
@@ -75,6 +77,7 @@ export function Inbox() {
                   <label className="field">
                     Task
                     <input
+                      autoComplete="off"
                       value={task.name}
                       required
                       maxLength={500}
@@ -119,7 +122,8 @@ export function Inbox() {
                   </label>
                   <label className="field">
                     Due date
-                    <input
+                    <DateTimeInput
+                      autoComplete="off"
                       type="datetime-local"
                       value={task.dueAt ?? ''}
                       onChange={(e) => setTask({ ...task, dueAt: e.target.value })}

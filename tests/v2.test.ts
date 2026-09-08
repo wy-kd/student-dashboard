@@ -410,6 +410,46 @@ test('recurring editor create/edit/delete round trip retains the existing occurr
     'Completed',
   );
 });
+test('semester break CRUD uses existing dates and preserves academic records and class series', async () => {
+  const before = await snapshot();
+  const semester = await saveRow('semester', {
+    ...defaults('semester'),
+    name: 'Break CRUD fixture',
+    startDate: '2026-09-01',
+    endDate: '2026-12-01',
+    teachingStart: '2026-09-07',
+  });
+  const b = await saveRow('importantDate', {
+    ...defaults('importantDate'),
+    name: 'Mid-semester break',
+    semesterId: semester.id,
+    kind: 'Break',
+    dueAt: '2026-09-21T00:00',
+    endDate: '2026-09-27',
+  });
+  const edited = await saveRow(
+    'importantDate',
+    { ...cleanInput('importantDate', b), endDate: '2026-09-28' },
+    b.id,
+    b.revision,
+  );
+  assert.equal(edited.endDate, '2026-09-28');
+  await assert.rejects(
+    saveRow(
+      'importantDate',
+      { ...cleanInput('importantDate', edited), endDate: '2026-09-20' },
+      edited.id,
+      edited.revision,
+    ),
+    /End date/,
+  );
+  const { deleteRow } = await import('../lib/service');
+  await deleteRow('importantDate', edited.id, edited.revision);
+  assert.equal(await db.importantDate.count({ where: { id: b.id } }), 0);
+  const after = await snapshot();
+  for (const entity of ['task', 'assignment', 'exam', 'class', 'studySession'] as const)
+    assert.deepEqual(after[entity], before[entity]);
+});
 test('Quick Capture organises transactionally into a linked task and cannot convert twice', async () => {
   const item = (await act('owner', { action: 'capture', name: 'Tutorial questions' }, base)) as any;
   await act(

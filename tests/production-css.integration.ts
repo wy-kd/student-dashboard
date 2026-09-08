@@ -17,5 +17,8 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.recurring-card\{[^}]*display:grid/);
   assert.match(css, /\.recurring-editor-actions\{[^}]*gap:12px/);
   assert.match(css, /\.ordinary-tasks\{[^}]*padding-top:28px/);
+  assert.match(css, /\.timer-float\{[^}]*position:fixed/);
+  assert.match(css, /\.widget-size-fields\{[^}]*gap:16px/);
+  assert.match(css, /\.semester-break-editor\{[^}]*gap:22px/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

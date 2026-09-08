@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { SemesterBreaks } from './SemesterBreaks';
 import { NotificationSettings } from './Notifications';
 import { Download, Plus, ShieldCheck } from 'lucide-react';
 import { useApp } from './context';
@@ -58,6 +59,7 @@ export function Settings() {
             <label className="field">
               Your name
               <input
+                autoComplete="off"
                 value={form.name}
                 maxLength={80}
                 required
@@ -67,6 +69,7 @@ export function Settings() {
             <label className="field">
               Timezone
               <input
+                autoComplete="off"
                 value={form.timezone}
                 required
                 onChange={(e) => setForm({ ...form, timezone: e.target.value })}
@@ -79,6 +82,7 @@ export function Settings() {
             <label className="field">
               Daily study capacity (hours)
               <input
+                autoComplete="off"
                 type="number"
                 min={0.25}
                 max={16}
@@ -119,12 +123,15 @@ export function Settings() {
             </button>
           }
         >
-          <SimpleRows entity="semester" rows={d.semester} />
-          <p className="muted">
-            Teaching weeks count from your first teaching date. Add a Break in Calendar covering a
-            whole teaching week to skip it. Use Important Dates for census dates and holidays. Demo
-            dates are illustrative.
-          </p>
+          {d.semester.map((semester) => (
+            <div className="semester-management" key={semester.id}>
+              <SimpleRows entity="semester" rows={[semester]} />
+              <SemesterBreaks semester={semester} />
+            </div>
+          ))}
+          {!d.semester.length && (
+            <p className="muted">Add a semester to manage teaching dates and breaks.</p>
+          )}
         </Section>
         <Section
           title="Backups & data export"
@@ -168,6 +175,7 @@ export function Settings() {
               <label className="button secondary file-button">
                 Choose JSON backup
                 <input
+                  autoComplete="off"
                   aria-label="Choose JSON backup to restore"
                   type="file"
                   accept="application/json,.json"

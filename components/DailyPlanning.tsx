@@ -1,4 +1,5 @@
 'use client';
+import { formatDate, formatTime } from '@/lib/format';
 import { useApp } from './context';
 import { Section, Empty, TaskRow } from './ui';
 import { calendarEvents, priorities } from '@/lib/calculations';
@@ -17,7 +18,7 @@ export function Today() {
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{today}</p>
+          <p className="eyebrow">{formatDate(today)}</p>
           <h1>Today</h1>
           <p>
             {planned.toFixed(1)}h planned · {Math.max(0, d.setting.dailyHours - planned).toFixed(1)}
@@ -38,7 +39,7 @@ export function Today() {
                 })
               }
             >
-              <time>{e.start.slice(11)}</time>
+              <time>{formatTime(e.start)}</time>
               <span>
                 <strong>{e.name}</strong>
                 <small>{e.kind}</small>
@@ -117,7 +118,7 @@ export function WeeklySummary({ compact = false }: { compact?: boolean }) {
           </p>
           {w.upcoming.map((r) => (
             <p key={r.id}>
-              {r.dueAt.slice(0, 10)} · {r.name}
+              {formatDate(r.dueAt)} · {r.name}
             </p>
           ))}
         </>

@@ -103,7 +103,12 @@ export function StudyTimer({
           <div className="form-grid">
             <label className="field">
               Activity
-              <input value={name} maxLength={500} onChange={(e) => setName(e.target.value)} />
+              <input
+                autoComplete="off"
+                value={name}
+                maxLength={500}
+                onChange={(e) => setName(e.target.value)}
+              />
             </label>
             <label className="field">
               Link to
@@ -128,6 +133,7 @@ export function StudyTimer({
                 <label className="field">
                   Focus minutes
                   <input
+                    autoComplete="off"
                     type="number"
                     min={1}
                     max={240}
@@ -138,6 +144,7 @@ export function StudyTimer({
                 <label className="field">
                   Break minutes
                   <input
+                    autoComplete="off"
                     type="number"
                     min={0}
                     max={120}
@@ -148,6 +155,7 @@ export function StudyTimer({
                 <label className="field">
                   Rounds
                   <input
+                    autoComplete="off"
                     type="number"
                     min={1}
                     max={12}
@@ -186,6 +194,7 @@ export function StudyTimer({
         <label className="field">
           Actual study minutes
           <input
+            autoComplete="off"
             type="number"
             min={0}
             max={1440}
@@ -198,6 +207,7 @@ export function StudyTimer({
         {task && task.status !== 'Completed' && (
           <label className="check-label">
             <input
+              autoComplete="off"
               type="checkbox"
               checked={complete}
               onChange={(e) => setComplete(e.target.checked)}
@@ -208,6 +218,7 @@ export function StudyTimer({
         <details className="more-fields">
           <summary>Add a quick note</summary>
           <textarea
+            autoComplete="off"
             aria-label="Session note"
             value={note}
             maxLength={2000}
@@ -365,7 +376,7 @@ export function MiniTimer() {
               </button>
             )}
             <button className="button primary" disabled={busy} onClick={() => run('timer.finish')}>
-              Finish
+              End
             </button>
           </>
         )}

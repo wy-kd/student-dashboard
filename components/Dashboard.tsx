@@ -1,6 +1,7 @@
 'use client';
+import { formatDate, formatTime } from '@/lib/format';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { GripVertical, MoveDownRight } from 'lucide-react';
+import { GripVertical, MoveDownRight, ArrowUp, ArrowDown, EyeOff } from 'lucide-react';
 import { useProductivity } from './productivity';
 import { Section, Empty, TaskRow, Badge, SubjectTag, Progress } from './ui';
 import {
@@ -22,6 +23,8 @@ import {
   type WidgetId,
   type Layout,
 } from '@/lib/dashboard-layout';
+import { SemesterWeek } from './SemesterWeek';
+import { teachingWeekInfo } from '@/lib/teaching-weeks';
 import { StudyTimer } from './StudyTimer';
 import { Today, WeeklySummary } from './DailyPlanning';
 export function Dashboard({ todayOnly = false }: { todayOnly?: boolean }) {
@@ -111,7 +114,7 @@ function WidgetDashboard() {
                     })
                   }
                 >
-                  <time>{e.start.slice(11)}</time>
+                  <time>{formatTime(e.start)}</time>
                   <span>{e.name}</span>
                 </button>
               ))}
@@ -139,12 +142,7 @@ function WidgetDashboard() {
                     : go(`/${r.entity === 'exam' ? 'exams' : 'assignments'}/${r.id}`)
                 }
               >
-                <time>
-                  {r.dueAt.slice(8, 10)}{' '}
-                  {new Date(r.dueAt.slice(0, 10) + 'T12:00').toLocaleDateString('en-AU', {
-                    month: 'short',
-                  })}
-                </time>
+                <time>{formatDate(r.dueAt)}</time>
                 <span>{r.name}</span>
               </button>
             ))}
@@ -193,7 +191,7 @@ function WidgetDashboard() {
               .filter((e) => e.entity === 'class')
               .map((e) => (
                 <button key={e.id} onClick={() => go('/timetable')}>
-                  {e.start.slice(11)} · {e.name}
+                  {formatTime(e.start)} · {e.name}
                 </button>
               ))}
             {!schedule.some((e) => e.entity === 'class') && <p>No classes today.</p>}
@@ -276,6 +274,7 @@ function WidgetDashboard() {
         return semester ? (
           <>
             <p>{semester.name}</p>
+            <SemesterWeek semester={semester} now={now} data={d} />
             <Progress value={semesterProgress(semester, now, d).percent} label="Semester elapsed" />
           </>
         ) : (
@@ -357,19 +356,13 @@ function WidgetDashboard() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {new Date(today + 'T12:00').toLocaleDateString('en-AU', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
-            {semester
-              ? ` · Week ${semesterProgress(semester, now, d).week} of ${semester.teachingWeeks}`
-              : ''}
+            {formatDate(today)}
+            {semester ? ' · ' + teachingWeekInfo(semester, now, d).label : ''}
           </p>
           <h1>Dashboard</h1>
         </div>
         <button
-          className="button secondary"
+          className={editing ? 'button primary' : 'button secondary'}
           onClick={() => {
             if (editing) done();
             else {
@@ -384,7 +377,8 @@ function WidgetDashboard() {
       </div>
       {editing && (
         <div className="layout-toolbar">
-          <strong>Editing {bp} layout</strong>
+          <strong>Editing Dashboard</strong>
+          <span className="muted">{bp} layout</span>
           <p>
             {bp === 'mobile'
               ? 'Use Move up / down to reorder widgets.'
@@ -445,51 +439,84 @@ function WidgetDashboard() {
               }}
             >
               {editing && (
-                <div className="widget-controls">
-                  {bp !== 'mobile' && (
-                    <button
-                      draggable
-                      aria-label={'Drag ' + widgetNames[w.id]}
-                      onDragStart={() => setDrag(w.id)}
-                    >
-                      <GripVertical size={18} />
-                    </button>
-                  )}
-                  <button onClick={() => setLayout((l) => moveWidget(l, bp, w.id, -1))}>
-                    Move up
-                  </button>
-                  <button onClick={() => setLayout((l) => moveWidget(l, bp, w.id, 1))}>
-                    Move down
-                  </button>
-                  <button onClick={() => change(w.id, { hidden: true })}>Hide</button>
-                  {bp !== 'mobile' && (
-                    <label>
-                      Width
-                      <select
-                        aria-label={widgetNames[w.id] + ' width'}
-                        value={w.width}
-                        onChange={(e) => change(w.id, { width: Number(e.target.value) })}
+                <div
+                  className="widget-controls"
+                  role="group"
+                  aria-label={widgetNames[w.id] + ' widget controls'}
+                >
+                  <span className="widget-control-title">Widget controls</span>
+                  <div className="widget-move-controls">
+                    {bp !== 'mobile' && (
+                      <button
+                        draggable
+                        aria-label={'Drag ' + widgetNames[w.id]}
+                        onDragStart={() => setDrag(w.id)}
                       >
-                        {Array.from({ length: bp === 'desktop' ? 10 : 4 }, (_, i) => i + 3).map(
-                          (n) => (
-                            <option key={n}>{n}</option>
-                          ),
-                        )}
-                      </select>
-                    </label>
-                  )}
-                  <label>
-                    Height
-                    <select
-                      aria-label={widgetNames[w.id] + ' height'}
-                      value={w.height}
-                      onChange={(e) => change(w.id, { height: Number(e.target.value) })}
+                        <GripVertical size={18} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      title="Move up"
+                      aria-label={'Move ' + widgetNames[w.id] + ' up'}
+                      onClick={() => setLayout((l) => moveWidget(l, bp, w.id, -1))}
                     >
-                      {[1, 2, 3, 4].map((n) => (
-                        <option key={n}>{n}</option>
-                      ))}
-                    </select>
-                  </label>
+                      <ArrowUp size={18} />
+                      <span>Move up</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Move down"
+                      aria-label={'Move ' + widgetNames[w.id] + ' down'}
+                      onClick={() => setLayout((l) => moveWidget(l, bp, w.id, 1))}
+                    >
+                      <ArrowDown size={18} />
+                      <span>Move down</span>
+                    </button>
+                  </div>
+                  <details className="widget-size">
+                    <summary>Size</summary>
+                    <div className="widget-size-fields">
+                      {bp !== 'mobile' && (
+                        <label>
+                          Width
+                          <select
+                            aria-label={widgetNames[w.id] + ' width'}
+                            value={w.width}
+                            onChange={(e) => change(w.id, { width: Number(e.target.value) })}
+                          >
+                            {Array.from({ length: bp === 'desktop' ? 10 : 4 }, (_, i) => i + 3).map(
+                              (n) => (
+                                <option key={n}>{n}</option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                      )}
+                      <label>
+                        Height
+                        <select
+                          aria-label={widgetNames[w.id] + ' height'}
+                          value={w.height}
+                          onChange={(e) => change(w.id, { height: Number(e.target.value) })}
+                        >
+                          {[1, 2, 3, 4].map((n) => (
+                            <option key={n}>{n}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </details>
+                  <button
+                    type="button"
+                    className="widget-hide"
+                    title="Hide widget"
+                    aria-label={'Hide ' + widgetNames[w.id]}
+                    onClick={() => change(w.id, { hidden: true })}
+                  >
+                    <EyeOff size={18} />
+                    Hide
+                  </button>
                 </div>
               )}
               <Section title={widgetNames[w.id]}>{content(w.id)}</Section>

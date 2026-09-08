@@ -1,4 +1,6 @@
 'use client';
+import { DateTimeInput } from './DateTimeInput';
+import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
 import { useProductivity } from './productivity';
 import { recurrenceDescription, nextOccurrence } from '@/lib/recurrence-description';
@@ -48,10 +50,10 @@ export function RecurringTasks() {
                 </p>
                 <p className="recurring-next">
                   {outstanding
-                    ? `Outstanding: ${outstanding.dueAt?.replace('T', ' ') ?? 'No date'}`
+                    ? `Outstanding: ${outstanding.dueAt ? formatDateTime(outstanding.dueAt) : 'No date'}`
                     : r.enabled
                       ? next
-                        ? `Next: ${next} ${r.time}`
+                        ? `Next: ${formatDate(next)} · ${formatTime(r.time)}`
                         : 'Series finished'
                       : 'Future generation paused'}
                 </p>
@@ -131,6 +133,7 @@ export function RecurringTasks() {
             <label className="field">
               Task
               <input
+                autoComplete="off"
                 required
                 maxLength={500}
                 value={row.name}
@@ -191,6 +194,7 @@ export function RecurringTasks() {
                 <label className="field">
                   Every N weeks
                   <input
+                    autoComplete="off"
                     type="number"
                     min={1}
                     max={52}
@@ -203,6 +207,7 @@ export function RecurringTasks() {
               <label className="field">
                 Custom interval (days)
                 <input
+                  autoComplete="off"
                   type="number"
                   min={1}
                   max={365}
@@ -213,7 +218,8 @@ export function RecurringTasks() {
             )}
             <label className="field">
               Start date
-              <input
+              <DateTimeInput
+                autoComplete="off"
                 type="date"
                 required
                 value={row.anchor}
@@ -222,7 +228,8 @@ export function RecurringTasks() {
             </label>
             <label className="field">
               Due time
-              <input
+              <DateTimeInput
+                autoComplete="off"
                 type="time"
                 required
                 value={row.time}
@@ -231,7 +238,8 @@ export function RecurringTasks() {
             </label>
             <label className="field">
               End date (optional)
-              <input
+              <DateTimeInput
+                autoComplete="off"
                 type="date"
                 value={row.endDate ?? ''}
                 onChange={(e) => setRow({ ...row, endDate: e.target.value || null })}
@@ -286,6 +294,7 @@ export function RecurringTasks() {
             <label className="field">
               Estimated hours
               <input
+                autoComplete="off"
                 type="number"
                 min={0}
                 max={1000}
@@ -298,6 +307,7 @@ export function RecurringTasks() {
           <div className="recurring-generation">
             <label className="check-label">
               <input
+                autoComplete="off"
                 type="checkbox"
                 checked={row.enabled}
                 onChange={(e) => setRow({ ...row, enabled: e.target.checked })}

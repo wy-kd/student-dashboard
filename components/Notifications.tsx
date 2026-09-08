@@ -1,4 +1,6 @@
 'use client';
+import { DateTimeInput } from './DateTimeInput';
+import { formatTimestamp, formatReminderMessage } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useProductivity } from './productivity';
 import { Section, Empty } from './ui';
@@ -57,11 +59,10 @@ export function NotificationCentre() {
         {(state?.notifications ?? []).map((n: any) => (
           <article key={n.id} className={'notification ' + (!n.readAt ? 'unread' : '')}>
             <p className="eyebrow">
-              {n.category} ·{' '}
-              {new Date(n.createdAt).toLocaleString('en-AU', { timeZone: d.setting.timezone })}
+              {n.category} · {formatTimestamp(n.createdAt, d.setting.timezone)}
             </p>
             <h3>{n.title}</h3>
-            <p>{n.message}</p>
+            <p>{formatReminderMessage(n.message)}</p>
             <div className="inline">
               <button className="button secondary" disabled={busy} onClick={() => visit(n)}>
                 Open
@@ -251,6 +252,7 @@ export function NotificationSettings() {
             }).map(([key, label]) => (
               <label className="check-label" key={key}>
                 <input
+                  autoComplete="off"
                   type="checkbox"
                   checked={form[key]}
                   onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
@@ -264,7 +266,8 @@ export function NotificationSettings() {
             <div className="form-grid">
               <label className="field">
                 Quiet hours start
-                <input
+                <DateTimeInput
+                  autoComplete="off"
                   type="time"
                   value={form.quietStart}
                   onChange={(e) => setForm({ ...form, quietStart: e.target.value })}
@@ -272,7 +275,8 @@ export function NotificationSettings() {
               </label>
               <label className="field">
                 Quiet hours end
-                <input
+                <DateTimeInput
+                  autoComplete="off"
                   type="time"
                   value={form.quietEnd}
                   onChange={(e) => setForm({ ...form, quietEnd: e.target.value })}
@@ -280,7 +284,8 @@ export function NotificationSettings() {
               </label>
               <label className="field">
                 Daily summary time
-                <input
+                <DateTimeInput
+                  autoComplete="off"
                   type="time"
                   value={form.summaryTime}
                   onChange={(e) => setForm({ ...form, summaryTime: e.target.value })}
@@ -340,6 +345,7 @@ export function NotificationSettings() {
                 <label key={kind} className="field">
                   {label}
                   <input
+                    autoComplete="off"
                     value={rules[kind] ?? ''}
                     onChange={(e) => setRules({ ...rules, [kind]: e.target.value })}
                   />
@@ -376,6 +382,7 @@ export function NotificationSettings() {
             <label className="field">
               Device name
               <input
+                autoComplete="off"
                 maxLength={80}
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}

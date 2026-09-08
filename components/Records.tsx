@@ -1,4 +1,5 @@
 'use client';
+import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
 import { RecurringTasks } from './RecurringTasks';
 import { Plus, ArrowLeft, ArrowUpRight } from 'lucide-react';
@@ -132,6 +133,7 @@ export function Tasks() {
             </select>
           </label>
           <input
+            autoComplete="off"
             aria-label="Filter tasks"
             placeholder="Filter tasks…"
             value={query}
@@ -269,6 +271,7 @@ export function SimpleRows({ entity, rows }: { entity: Entity; rows: RecordRow[]
         <div className="simple-row" key={r.id}>
           {['milestone', 'weeklyContent', 'studySession'].includes(entity) && (
             <input
+              autoComplete="off"
               type="checkbox"
               aria-label={'Complete ' + r.name}
               checked={entity === 'milestone' ? r.done : r.completed}
@@ -293,13 +296,13 @@ export function SimpleRows({ entity, rows }: { entity: Entity; rows: RecordRow[]
             <div className="metadata">
               {r.subjectId && <SubjectTag id={r.subjectId} />}
               <span>
-                {r.dueAt?.replace('T', ' · ')}
+                {r.dueAt ? formatDateTime(r.dueAt) : null}
                 {entity === 'semester'
-                  ? `${r.startDate}–${r.endDate} · ${r.teachingWeeks} teaching weeks${r.examStart ? ' · Exams ' + r.examStart + '–' + r.examEnd : ''}`
+                  ? `${formatDate(r.startDate)}–${formatDate(r.endDate)} · ${r.teachingWeeks} teaching weeks${r.examStart ? ' · Exams ' + formatDate(r.examStart) + '–' + formatDate(r.examEnd) : ''}`
                   : ''}
                 {r.week ? 'Week ' + r.week : ''}
                 {r.startTime
-                  ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][r.day]} · ${r.startTime}–${r.endTime} · ${r.location}`
+                  ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][r.day]} · ${formatTime(r.startTime)}–${formatTime(r.endTime)} · ${r.location}`
                   : ''}
                 {entity === 'studySession'
                   ? ` · planned ${Math.round(r.plannedHours * 60)}m · actual ${Math.round(r.actualHours * 60)}m`
@@ -367,7 +370,7 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
             ) : (
               <Due at={r.dueAt} exam={exam} />
             )}
-            <p>{r.dueAt.replace('T', ' · ')}</p>
+            <p>{formatDateTime(r.dueAt)}</p>
           </div>
           <div>
             <strong>{r.weighting}%</strong>
@@ -502,14 +505,14 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
                 .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
                 .map((m) => (
                   <div key={m.id} className={'timeline-event ' + (m.done ? 'done' : '')}>
-                    <div className="timeline-date">{m.dueAt.slice(0, 10)}</div>
+                    <div className="timeline-date">{formatDate(m.dueAt)}</div>
                     <SimpleRows entity="milestone" rows={[m]} />
                     {!m.done && m.dueAt < now && <Badge>Missed</Badge>}
                   </div>
                 ))}
               <div className="timeline-event">
-                <div className="timeline-date">{r.dueAt.slice(0, 10)}</div>
-                <strong>Submission · {r.dueAt.slice(11)}</strong>
+                <div className="timeline-date">{formatDate(r.dueAt)}</div>
+                <strong>Submission · {formatTime(r.dueAt)}</strong>
                 <Badge>{r.status}</Badge>
               </div>
             </div>

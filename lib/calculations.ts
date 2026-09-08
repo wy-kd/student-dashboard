@@ -1,3 +1,4 @@
+import { teachingWeekInfo } from './teaching-weeks';
 import type { Data, RecordRow } from './model';
 export const clamp = (n: number, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 export const round = (n: number) => Math.round(n * 10) / 10;
@@ -172,18 +173,7 @@ export function semesterProgress(s: RecordRow, now: string, d: Data) {
   const ids = new Set(d.subject.filter((x) => x.semesterId === s.id).map((x) => x.id));
   const assignments = d.assignment.filter((a) => ids.has(a.subjectId)),
     assessments = [...assignments, ...d.exam.filter((e) => ids.has(e.subjectId))];
-  const breaks = d.importantDate.filter((e) => e.semesterId === s.id && e.kind === 'Break');
-  let week = 0;
-  for (
-    let day = s.teachingStart;
-    day <= now.slice(0, 10) && day <= s.endDate;
-    day = addDays(day, 7)
-  ) {
-    if (
-      !breaks.some((b) => b.dueAt.slice(0, 10) <= day && (b.endDate ?? b.dueAt.slice(0, 10)) >= day)
-    )
-      week++;
-  }
+  const teaching = teachingWeekInfo(s, now, d);
   return {
     percent: clamp(
       round(
@@ -192,7 +182,8 @@ export function semesterProgress(s: RecordRow, now: string, d: Data) {
           100,
       ),
     ),
-    week: Math.min(s.teachingWeeks, Math.max(0, week)),
+    week: teaching.week,
+    teaching,
     completed: assignments.filter((a) => a.status === 'Submitted').length,
     total: assignments.length,
     weightSubmitted: assessments
@@ -231,7 +222,7 @@ export function calendarEvents(d: Data, start: string, end: string): CalendarEve
           start: x.dueAt,
           end: x.endDate,
           subjectId: x.subjectId ?? d.assignment.find((a) => a.id === x.assignmentId)?.subjectId,
-          kind,
+          kind: entity === 'importantDate' && x.kind === 'Break' ? 'Break' : kind,
         });
   }
   for (const a of d.assignment)

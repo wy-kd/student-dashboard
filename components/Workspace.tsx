@@ -381,7 +381,8 @@ export function Workspace() {
         className={
           'app-shell ' +
           (route === 'focus' ? 'focus-shell ' : '') +
-          (collapsed ? 'sidebar-collapsed' : '')
+          (collapsed ? 'sidebar-collapsed ' : '') +
+          (allData.productivity?.timer && route !== 'focus' ? 'has-floating-timer' : '')
         }
         data-density={allData.productivity?.preference?.density ?? 'Comfortable'}
       >
@@ -438,6 +439,7 @@ export function Workspace() {
             <div className="search-box">
               <Search size={18} />
               <input
+                autoComplete="off"
                 aria-label="Search all subjects, assessments, tasks and notes"
                 placeholder="Search your workspace…"
                 value={query}
@@ -581,7 +583,7 @@ export function Workspace() {
             </footer>
           </main>
           {route !== 'focus' && (
-            <div className="timer-dock">
+            <div className="timer-float">
               <MiniTimer />
             </div>
           )}

@@ -326,7 +326,8 @@ function Harness() {
           className={
             'app-shell ' +
             (collapsed ? 'sidebar-collapsed ' : '') +
-            (route === 'Focus' ? 'focus-shell' : '')
+            (route === 'Focus' ? 'focus-shell' : '') +
+            (timer && route !== 'Focus' ? ' has-floating-timer' : '')
           }
           data-density={density}
         >
@@ -358,7 +359,7 @@ function Harness() {
               {pages[route]}
             </main>
             {timer && route !== 'Focus' && (
-              <div className="timer-dock">
+              <div className="timer-float">
                 <MiniTimer />
               </div>
             )}
