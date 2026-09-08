@@ -2473,19 +2473,7 @@ td:first-child {
 .sidebar-bottom {
   flex-shrink: 0;
 }
-.fullscreen-controls {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px max(16px, env(safe-area-inset-right)) 4px;
-  padding-top: max(12px, env(safe-area-inset-top));
-}
-.distraction-free .sidebar,
-.distraction-free .topbar,
-.distraction-free .mobile-semester,
-.distraction-free .workspace-footer {
-  display: none;
-}
-.distraction-free .main-shell,
+
 .focus-shell .main-shell {
   margin-left: 0;
   width: 100%;
@@ -2498,128 +2486,168 @@ td:first-child {
 .timer-dock:empty {
   display: none;
 }
+/* The dock uses a title column, clock and compact action group. */
 .mini-timer {
   position: static;
   inset: auto;
-  max-width: 900px;
   width: 100%;
+  max-width: 960px;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 12px 18px;
-  border-radius: 14px;
+  gap: 28px;
+  padding: 16px 20px;
   background: var(--surface);
   border: 1px solid var(--line);
+  border-radius: 14px;
   box-shadow: var(--shadow);
 }
 .mini-timer > button.mini-timer-summary {
-  min-height: 44px;
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
+  min-width: 0;
+  flex: 1;
   text-align: left;
 }
 .mini-timer .mini-timer-title {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
-  white-space: normal;
-  color: var(--ink);
 }
 .mini-timer strong {
-  white-space: nowrap;
+  display: block;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.95rem;
-  max-width: none;
+  white-space: nowrap;
+  max-width: 100%;
 }
-.mini-timer small {
+.mini-timer-status {
+  display: inline-block;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.mini-timer-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+.mini-timer-mode {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .mini-timer .mini-timer-time {
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  font-size: 2.25rem;
-  line-height: 1.15;
+  font-size: 2.5rem;
   font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   color: var(--ink);
-  letter-spacing: -0.04em;
+  white-space: nowrap;
 }
-.mini-timer[data-state='paused'] .mini-timer-time {
+.mini-timer[data-state='paused'] .mini-timer-status {
   color: var(--muted);
 }
 .mini-timer-controls {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 .mini-timer-controls .button {
+  height: 44px;
   min-height: 44px;
-  min-width: 78px;
+  padding: 0 16px;
+  min-width: 76px;
 }
+/* Recurrence management and ordinary task filtering are separate sections. */
 .recurring-section {
-  margin: 0 0 28px;
-  padding: 20px;
+  padding: 28px;
+  margin-bottom: 36px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--surface);
 }
-.recurring-section > summary {
-  font-size: 1.05rem;
-  font-weight: 650;
-  cursor: pointer;
-  padding: 4px 0;
+.recurring-heading h2 {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+  letter-spacing: -0.025em;
 }
-.recurring-section > p {
-  max-width: 70ch;
+.recurring-heading p {
+  margin: 0;
+  max-width: 65ch;
+  line-height: 1.6;
   color: var(--muted);
-  margin: 16px 0 20px;
+}
+.recurring-list-heading {
+  margin: 28px 0 16px;
+  font-size: 1rem;
+  font-weight: 650;
 }
 .recurring-list {
   display: grid;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 16px;
 }
 .recurring-card {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px 24px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 20px;
 }
 .recurring-description {
-  flex: 1;
-  min-width: min(220px, 100%);
-  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .recurring-description h3 {
-  margin: 0 0 8px;
+  font-size: 1.125rem;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
 }
 .recurring-description p {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+  line-height: 1.5;
 }
-.recurring-description small {
+.recurring-subject {
   color: var(--muted);
+  font-size: 0.875rem;
+}
+.recurring-description .recurring-next {
+  margin: 14px 0 0;
 }
 .series-status {
+  align-self: start;
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 4px 9px;
-  background: var(--bg);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
+  background: var(--surface);
 }
 .series-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
   align-items: center;
+  gap: 24px;
+  grid-column: 1 / -1;
+}
+.series-actions .button {
+  min-height: 44px;
+}
+.series-actions .danger-text {
+  margin-left: auto;
+  background: transparent;
+  border-color: transparent;
 }
 .danger-text {
   color: #b42332;
@@ -2627,39 +2655,94 @@ td:first-child {
 [data-theme='dark'] .danger-text {
   color: #ffabb5;
 }
+.recurring-empty {
+  padding: 20px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.recurring-empty strong {
+  display: block;
+  font-weight: 600;
+}
+.recurring-empty p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.recurring-add {
+  margin-top: 20px;
+  min-height: 44px;
+}
 .recurring-editor {
-  max-width: 780px;
-  padding: 24px;
-  margin-top: 24px;
+  max-width: 840px;
+  padding: 28px;
+  margin-top: 28px;
   border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
   border-radius: 12px;
   background: var(--bg);
 }
 .recurring-editor > h3 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  font-size: 1.25rem;
 }
 .recurring-editor > p {
   color: var(--muted);
-  margin: 0 0 24px;
+  line-height: 1.5;
+  margin: 0 0 28px;
 }
 .recurring-editor .form-grid {
-  gap: 22px 24px;
+  display: grid;
+  gap: 24px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 24px;
+  margin: 0;
 }
 .recurring-editor .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
 .recurring-editor input,
 .recurring-editor select {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
 }
 .recurring-editor input[type='checkbox'] {
-  width: auto;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex-shrink: 0;
+}
+.recurring-generation {
+  padding: 24px 0;
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.recurring-generation .check-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.recurring-editor-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.recurring-editor-actions .button {
+  min-height: 44px;
+}
+.ordinary-tasks {
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.ordinary-tasks > h2 {
+  font-size: 1.5rem;
+  margin: 0 0 20px;
 }
 @media (min-width: 801px) {
   .sidebar-collapsed .sidebar {
@@ -2694,7 +2777,6 @@ td:first-child {
     justify-content: center;
     padding: 12px 0 0;
   }
-  .distraction-free .main-shell,
   .focus-shell .main-shell {
     margin-left: 0;
   }
@@ -2703,10 +2785,7 @@ td:first-child {
   .sidebar-toggle {
     display: none;
   }
-  .mini-timer {
-    gap: 12px;
-    padding: 12px;
-  }
+
   .recurring-editor .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2715,7 +2794,6 @@ td:first-child {
   .main-shell {
     padding-bottom: calc(62px + env(safe-area-inset-bottom));
   }
-  .distraction-free .main-shell,
   .focus-shell .main-shell {
     padding-bottom: 0;
   }
@@ -2753,20 +2831,7 @@ td:first-child {
   .workspace-footer {
     padding-bottom: 1rem;
   }
-  .mini-timer {
-    flex-wrap: wrap;
-  }
-  .mini-timer > button.mini-timer-summary {
-  min-height: 44px;
-    flex-basis: 100%;
-    gap: 12px;
-  }
-  .mini-timer-controls {
-    width: 100%;
-  }
-  .mini-timer-controls .button {
-    flex: 1;
-  }
+
   .recurring-section {
     padding: 16px;
   }
@@ -2778,9 +2843,6 @@ td:first-child {
   }
   .recurring-card .series-actions {
     width: 100%;
-  }
-  .recurring-card .series-actions .button {
-    flex: 1;
   }
 }
 @media (display-mode: standalone) {
@@ -2802,8 +2864,7 @@ td:first-child {
     overflow: visible;
   }
   .timer-dock,
-  .bottom-nav,
-  .fullscreen-controls {
+  .bottom-nav {
     display: none;
   }
 }
@@ -2818,5 +2879,58 @@ td:first-child {
   .timer-dock {
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
+  }
+}
+
+@media (max-width: 1100px) {
+  .mini-timer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .mini-timer > button.mini-timer-summary {
+    flex-basis: 100%;
+  }
+  .mini-timer-controls {
+    margin-left: auto;
+  }
+}
+@media (max-width: 767px) {
+  .mini-timer {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .mini-timer > button.mini-timer-summary {
+    gap: 14px;
+  }
+  .mini-timer .mini-timer-title {
+    gap: 6px;
+  }
+  .mini-timer .mini-timer-time {
+    font-size: 2.25rem;
+  }
+  .mini-timer-controls {
+    width: 100%;
+  }
+  .mini-timer-controls .button {
+    flex: 1;
+  }
+  .recurring-section {
+    padding: 18px 16px;
+  }
+  .recurring-card {
+    padding: 16px;
+    gap: 16px;
+  }
+  .recurring-card .series-actions {
+    gap: 24px;
+  }
+  .recurring-editor {
+    padding: 20px 16px;
+  }
+  .recurring-editor-actions .button {
+    flex: 1;
+  }
+  .ordinary-tasks .toolbar {
+    gap: 16px;
   }
 }

@@ -327,7 +327,7 @@ export function MiniTimer() {
       <button className="mini-timer-summary" onClick={() => go('/focus')} title="Open Focus Mode">
         <span className="mini-timer-title">
           <strong>{t.name}</strong>
-          <small>
+          <span className="mini-timer-status">
             {t.status === 'review'
               ? 'Ready to save'
               : t.status === 'paused'
@@ -337,9 +337,16 @@ export function MiniTimer() {
                   : t.phase === 'break'
                     ? 'Break running'
                     : 'Running'}
-          </small>
+          </span>
         </span>
-        <span className="mini-timer-time">{clockText(v.remainingMs ?? v.elapsedMs)}</span>
+        <span className="mini-timer-clock">
+          <span className="mini-timer-mode">
+            {t.mode === 'stopwatch' ? 'Elapsed' : 'Remaining'}
+          </span>
+          <span className="mini-timer-time" role="timer">
+            {clockText(v.remainingMs ?? v.elapsedMs)}
+          </span>
+        </span>
       </button>
       <div className="mini-timer-controls">
         {t.status === 'review' ? (

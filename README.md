@@ -532,6 +532,12 @@ The scheduler lives inside Next.js and recovers persisted reminders after restar
 
 ## V2.1 usability polish
 
-V2.1 adds a saved collapsible navigation rail, optional full-screen/distraction-free layout, a responsive timer dock and prompt cross-device timer updates. Recurring series have a separate editor and confirmed deletion that preserves completed history. Automatic Plan My Day/Plan Next Week proposals are removed; manual study sessions, Today and Weekly Review remain.
+V2.1 adds a saved collapsible navigation rail, a responsive timer dock and prompt cross-device timer updates. V2.1.1 removes the application fullscreen control, rebuilds the timer and recurring-task layouts and guards against stale production CSS. Recurring series have a separate editor and confirmed deletion that preserves completed history. Automatic Plan My Day/Plan Next Week proposals are removed; manual study sessions, Today and Weekly Review remain.
 
 No migration, new dependency, secret or Windows/Tailscale configuration change is required. See [V2.1 behaviour, safe Acer update commands and device checks](docs/V2.1-GUIDE.md).
+
+## V2.1.1 UI corrections
+
+Use the [V2.1.1 Acer update and verification guide](docs/V2.1.1-GUIDE.md). This release keeps one saved sidebar controller, removes application fullscreen while retaining Study Focus Mode and PWA standalone access, gives the timer a separate activity/status/clock hierarchy and separates recurring-series management from ordinary task filtering.
+
+An incremental production build reproduced stale CSS after source edits. Production builds now disable the persistent Turbopack build cache, and `npm run build` checks the emitted CSS before succeeding. This affects installation/update builds only; Windows startup still starts the existing production build without rebuilding. No database migration, new dependency or Windows/Tailscale change is included.

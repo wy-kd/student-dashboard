@@ -116,37 +116,44 @@ export function Tasks() {
     <>
       <Heading title="Tasks" sub="Turn bigger goals into the next small step." entity="task" />
       <RecurringTasks />
-      <div className="toolbar">
-        <label>
-          Show{' '}
-          <select aria-label="Task view" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            {options.map((o) => (
-              <option key={o}>{o}</option>
-            ))}
-          </select>
-        </label>
-        <input
-          aria-label="Filter tasks"
-          placeholder="Filter tasks…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-      {Object.entries(groups).map(([key, rows]) => (
-        <Section key={key} title={key} sub={`${rows.length} tasks`}>
-          {rows.map((t) => (
-            <TaskRow key={t.id} row={t} />
-          ))}
-        </Section>
-      ))}
-      {!tasks.length && (
-        <Section title={filter}>
-          <Empty
-            title="You’re clear here"
-            text="Switch views to see other tasks, or add a new one."
+      <section className="ordinary-tasks" aria-labelledby="tasks-list-heading">
+        <h2 id="tasks-list-heading">Tasks</h2>
+        <div className="toolbar">
+          <label>
+            Show{' '}
+            <select
+              aria-label="Task view"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              {options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </label>
+          <input
+            aria-label="Filter tasks"
+            placeholder="Filter tasks…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-        </Section>
-      )}
+        </div>
+        {Object.entries(groups).map(([key, rows]) => (
+          <Section key={key} title={key} sub={`${rows.length} tasks`}>
+            {rows.map((t) => (
+              <TaskRow key={t.id} row={t} />
+            ))}
+          </Section>
+        ))}
+        {!tasks.length && (
+          <Section title={filter}>
+            <Empty
+              title="You’re clear here"
+              text="Switch views to see other tasks, or add a new one."
+            />
+          </Section>
+        )}
+      </section>
     </>
   );
 }

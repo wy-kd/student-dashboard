@@ -14,8 +14,8 @@ import { WeeklyReview } from '../components/DailyPlanning';
 import { Editor } from '../components/Editor';
 import { defaultLayout } from '../lib/dashboard-layout';
 import { AppSidebar, BottomNavigation } from '../components/AppNavigation';
-import { useAppFullscreen } from '../components/useAppFullscreen';
-import { readSidebarPreference, saveSidebarPreference } from '../lib/navigation-preference';
+import { checkSidebar } from './sidebar-browser';
+import { useSidebarPreference } from '../components/useSidebarPreference';
 import { defaults, entities, type Data } from '../lib/model';
 const date = '2026-09-07T09:00';
 const row = (entity: any, id: string, extra: any) => ({
@@ -170,27 +170,22 @@ d.productivity = {
   pushPublicKey: null,
 };
 function Harness() {
-  const fullscreen = useAppFullscreen();
-  const [collapsed, setCollapsed] = useState(false),
-    [menu, setMenu] = useState(false),
+  const { collapsed, toggleSidebar } = useSidebarPreference();
+  const [menu, setMenu] = useState(false),
     [density, setDensity] = useState('Comfortable');
-  useEffect(() => {
-    setCollapsed(readSidebarPreference(localStorage, window.innerWidth <= 1150));
-  }, []);
-  function toggleSidebar() {
-    setCollapsed(!collapsed);
-    saveSidebarPreference(localStorage, !collapsed);
-  }
 
   const [route, go] = useState('Dashboard'),
     [editor, open] = useState<any>(null),
     [empty, setEmpty] = useState(false),
     [dark, setDark] = useState(false),
     [timer, setTimer] = useState(false),
+    [timerMode, setTimerMode] = useState('countdown'),
+    [timerStatus, setTimerStatus] = useState('running'),
     [toast, notify] = useState('');
   const data: Data = empty ? { ...d, ...Object.fromEntries(entities.map((e) => [e, []])) } : d;
   data.productivity = {
     ...d.productivity,
+    recurrences: empty ? [] : d.productivity.recurrences,
     serverNow: Date.now(),
     timer: timer
       ? {
@@ -198,9 +193,9 @@ function Harness() {
           userId: 'owner',
           activeKey: 'owner',
           revision: 0,
-          name: 'Security Report',
-          mode: 'countdown',
-          status: 'running',
+          name: 'Focused study',
+          mode: timerMode,
+          status: timerStatus,
           phase: 'focus',
           startedAt: Date.now() - 12 * 60000,
           segmentAt: Date.now() - 12 * 60000,
@@ -301,18 +296,41 @@ function Harness() {
             <input type="checkbox" checked={timer} onChange={(e) => setTimer(e.target.checked)} />
             Active timer
           </label>
+          <label>
+            Timer mode
+            <select value={timerMode} onChange={(e) => setTimerMode(e.target.value)}>
+              <option>countdown</option>
+              <option>stopwatch</option>
+            </select>
+          </label>
+          <label>
+            Timer state
+            <select value={timerStatus} onChange={(e) => setTimerStatus(e.target.value)}>
+              <option>running</option>
+              <option>paused</option>
+              <option>review</option>
+            </select>
+          </label>
+          <button
+            onClick={() => {
+              void checkSidebar()
+                .then(notify)
+                .catch((e) => notify(e.message));
+            }}
+          >
+            Run navigation checks
+          </button>
           <button onClick={() => open({ entity: 'assignment' })}>New assignment</button>
         </nav>
         <div
           className={
             'app-shell ' +
             (collapsed ? 'sidebar-collapsed ' : '') +
-            (fullscreen.active ? 'distraction-free ' : '') +
             (route === 'Focus' ? 'focus-shell' : '')
           }
           data-density={density}
         >
-          {menu && !fullscreen.active && (
+          {menu && (
             <button
               className="sidebar-scrim"
               aria-label="Close navigation"
@@ -327,26 +345,15 @@ function Harness() {
             onSignOut={() => notify('Fixture only')}
           />
           <div className="main-shell">
-            {fullscreen.active ? (
-              <div className="fullscreen-controls">
-                <button className="button secondary" onClick={fullscreen.exit}>
-                  Exit Full Screen
-                </button>
-              </div>
-            ) : (
-              <header className="topbar">
-                <button className="button secondary" onClick={fullscreen.enter}>
-                  Enter Full Screen
-                </button>
-                <button
-                  className="icon-button mobile-menu"
-                  aria-label="Open navigation"
-                  onClick={() => setMenu(!menu)}
-                >
-                  Menu
-                </button>
-              </header>
-            )}
+            <header className="topbar">
+              <button
+                className="icon-button mobile-menu"
+                aria-label="Open navigation"
+                onClick={() => setMenu(!menu)}
+              >
+                Menu
+              </button>
+            </header>
             <main id="main" tabIndex={-1}>
               {pages[route]}
             </main>
@@ -357,7 +364,7 @@ function Harness() {
             )}
           </div>
         </div>
-        {!fullscreen.active && route !== 'Focus' && (
+        {route !== 'Focus' && (
           <BottomNavigation
             route={route.toLowerCase()}
             menu={menu}

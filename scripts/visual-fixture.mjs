@@ -16,9 +16,7 @@ writeFileSync(
   readdirSync(dir)
     .filter((x) => x.endsWith('.css'))
     .map((x) => readFileSync(dir + '/' + x, 'utf8'))
-    .join('\n') +
-    '\n' +
-    readFileSync('app/globals.css', 'utf8').split('/* V2:')[1].split('*/').slice(1).join('*/'),
+    .join('\n'),
 );
 const css = '<link rel="stylesheet" href="/v2-fixture.css">';
 writeFileSync(

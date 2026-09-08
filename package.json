@@ -17,7 +17,8 @@
     "db:seed": "node --import tsx scripts/seed.ts",
     "db:backup": "node --import tsx scripts/backup.ts",
     "password:reset": "node --import tsx scripts/reset-password.ts",
-    "push:setup": "node scripts/push-setup.mjs"
+    "push:setup": "node scripts/push-setup.mjs",
+    "postbuild": "node --import tsx --test tests/production-css.integration.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

@@ -16,6 +16,9 @@ try {
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // A cached build reproduced stale global CSS after source edits (V2.1.1).
+  // Compile current sources on updates; production startup still uses the saved build.
+  experimental: { turbopackFileSystemCacheForBuild: false },
   allowedDevOrigins: ['terminal.local', ...lanAddresses],
   async headers() {
     return [

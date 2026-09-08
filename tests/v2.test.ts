@@ -349,6 +349,67 @@ test('recurrence creates only one outstanding task, preserves history and change
     '2026-09-21',
   );
 });
+test('recurring editor create/edit/delete round trip retains the existing occurrence', async () => {
+  const recurrence = {
+    name: 'Editor regression',
+    subjectId: null,
+    assignmentId: null,
+    priority: 'Medium',
+    estimatedHours: 1,
+    anchor: '2026-09-07',
+    time: '17:00',
+    intervalDays: 7,
+    weekdays: '',
+    weekInterval: 1,
+    endDate: null,
+    enabled: true,
+  };
+  await act('owner', { action: 'recurrence.save', recurrence }, base);
+  const original = await db.recurrence.findFirstOrThrow({ where: { name: recurrence.name } });
+  const occurrence = await db.taskOccurrence.findFirstOrThrow({
+    where: { recurrenceId: original.id },
+  });
+  const taskBefore = await db.task.findUniqueOrThrow({ where: { id: occurrence.taskId } });
+  await act(
+    'owner',
+    {
+      action: 'recurrence.save',
+      id: original.id,
+      revision: original.revision,
+      recurrence: { ...recurrence, name: 'Edited regression', intervalDays: 14, enabled: false },
+    },
+    base,
+  );
+  const edited = await db.recurrence.findUniqueOrThrow({ where: { id: original.id } });
+  assert.equal(edited.intervalDays, 14);
+  assert.equal(edited.enabled, false);
+  assert.deepEqual(await db.task.findUniqueOrThrow({ where: { id: taskBefore.id } }), taskBefore);
+  await assert.rejects(
+    act(
+      'owner',
+      { action: 'recurrence.save', id: original.id, revision: original.revision, recurrence },
+      base,
+    ),
+    /changed/,
+  );
+  // Make the occurrence historical before deleting the definition.
+  await saveRow(
+    'task',
+    cleanInput('task', { ...taskBefore, status: 'Completed' }),
+    taskBefore.id,
+    taskBefore.revision,
+  );
+  await act(
+    'owner',
+    { action: 'recurrence.delete', id: edited.id, revision: edited.revision },
+    base,
+  );
+  assert.equal(await db.recurrence.count({ where: { id: edited.id } }), 0);
+  assert.equal(
+    (await db.task.findUniqueOrThrow({ where: { id: taskBefore.id } })).status,
+    'Completed',
+  );
+});
 test('Quick Capture organises transactionally into a linked task and cannot convert twice', async () => {
   const item = (await act('owner', { action: 'capture', name: 'Tutorial questions' }, base)) as any;
   await act(

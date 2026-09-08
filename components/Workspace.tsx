@@ -12,15 +12,12 @@ import {
   ArrowRight,
   RefreshCw,
   Bell,
-  Maximize,
-  Minimize,
 } from 'lucide-react';
 import { AppContext, type Editor as EditorType } from './context';
 import { Editor } from './Editor';
 import { AppSidebar, BottomNavigation } from './AppNavigation';
 import { useTimerSync } from './useTimerSync';
-import { useAppFullscreen } from './useAppFullscreen';
-import { readSidebarPreference, saveSidebarPreference } from '@/lib/navigation-preference';
+import { useSidebarPreference } from './useSidebarPreference';
 import { MiniTimer, FocusMode } from './StudyTimer';
 import { Inbox, QuickCapture } from './Inbox';
 import { NotificationCentre } from './Notifications';
@@ -65,7 +62,6 @@ export function Workspace() {
     [toast, setToast] = useState(''),
     [problem, setProblem] = useState(''),
     [menu, setMenu] = useState(false),
-    [collapsed, setCollapsed] = useState(false),
     [quick, setQuick] = useState(false),
     [query, setQuery] = useState(''),
     [dark, setDark] = useState(false),
@@ -76,22 +72,12 @@ export function Workspace() {
     [busy, setBusy] = useState(false);
   const [route, id] = pathname.split('/').slice(1);
   const notify = useCallback((s: string) => setToast(s), []);
-  const fullscreen = useAppFullscreen();
+  const { collapsed, toggleSidebar } = useSidebarPreference();
   const signedOut = useCallback(() => {
     setAuth({ setup: false, signedIn: false });
     setData(null);
   }, []);
   const timerSync = useTimerSync(!!auth?.signedIn, signedOut);
-  useEffect(() => {
-    setCollapsed(
-      readSidebarPreference(localStorage, window.matchMedia('(max-width: 1150px)').matches),
-    );
-  }, []);
-  function toggleSidebar() {
-    const next = !collapsed;
-    setCollapsed(next);
-    saveSidebarPreference(localStorage, next);
-  }
   const reload = useCallback(
     async (refreshTimer = true) => {
       const res = await fetch('/api/data', { cache: 'no-store' });
@@ -395,12 +381,11 @@ export function Workspace() {
         className={
           'app-shell ' +
           (route === 'focus' ? 'focus-shell ' : '') +
-          (collapsed ? 'sidebar-collapsed ' : '') +
-          (fullscreen.active ? 'distraction-free' : '')
+          (collapsed ? 'sidebar-collapsed' : '')
         }
         data-density={allData.productivity?.preference?.density ?? 'Comfortable'}
       >
-        {menu && !fullscreen.active && route !== 'focus' && (
+        {menu && route !== 'focus' && (
           <button
             className="sidebar-scrim"
             aria-label="Close navigation"
@@ -428,27 +413,7 @@ export function Workspace() {
           }}
         />
         <div className="main-shell">
-          {fullscreen.active && (
-            <div className="fullscreen-controls">
-              <button className="button secondary" onClick={fullscreen.exit}>
-                <Minimize size={18} />
-                Exit Full Screen
-              </button>
-            </div>
-          )}
           <header className="topbar">
-            <button
-              className="icon-button fullscreen-enter"
-              title="Full screen"
-              aria-label="Enter Full Screen"
-              onClick={() => {
-                setMenu(false);
-                setQuick(false);
-                void fullscreen.enter();
-              }}
-            >
-              <Maximize size={20} />
-            </button>
             <button
               className="icon-button notification-bell"
               aria-label={
@@ -622,7 +587,7 @@ export function Workspace() {
           )}
         </div>
       </div>
-      {route !== 'focus' && !fullscreen.active && (
+      {route !== 'focus' && (
         <>
           <BottomNavigation
             route={route}
