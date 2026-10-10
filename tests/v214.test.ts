@@ -81,8 +81,12 @@ test('all active timer surfaces expose Pause/Resume and End without cancellation
       rounds: 1,
       revision: 0,
     };
-    for (const component of [StudyTimer, MiniTimer, FocusMode]) {
-      const html = render(React.createElement(component), data);
+    for (const node of [
+      React.createElement(StudyTimer),
+      React.createElement(MiniTimer),
+      React.createElement(FocusMode),
+    ]) {
+      const html = render(node, data);
       assert.match(html, status === 'paused' ? />Resume</ : />Pause</);
       assert.match(html, />End</);
       assert.doesNotMatch(html, /Cancel|cancel|Discard|Finish/);
@@ -108,7 +112,7 @@ test('ended timer exposes review with Save and Discard only in the main review f
   assert.match(review, /type="button"[^>]*>Discard session/);
   assert.doesNotMatch(review, /Cancel|Pause|Resume|>End</);
   const mini = render(React.createElement(MiniTimer), data);
-  assert.match(mini, /Review &amp; save/);
+  assert.equal(mini, '');
   assert.doesNotMatch(mini, /Cancel|Discard|Pause|Resume|>End</);
 });
 test('Dashboard begins with its heading and moves one date/week summary into Semester progress', () => {
@@ -117,18 +121,18 @@ test('Dashboard begins with its heading and moves one date/week summary into Sem
   assert.match(html, /Semester progress/);
   assert.match(
     html,
-    /QUT Y1S2<\/span><span aria-hidden="true">\|<\/span><span>11\/10\/2026 - Week 11\/13<\/span>/,
+    /QUT Y1S2<\/span><span aria-hidden="true">\|<\/span><span>11\/10\/2026 · Week 11\/13<\/span>/,
   );
   assert.equal((html.match(/11\/10\/2026/g) ?? []).length, 1);
   assert.equal((html.match(/Week 11\/13/g) ?? []).length, 1);
-  assert.doesNotMatch(html, /Week 11 of 13/);
+  assert.doesNotMatch(html, /Week 11 of 13|11\/10\/2026 - Week/);
 });
 test('dated semester summary preserves before, break/resumption and complete states', () => {
   const data = fixture();
   for (const [now, expected] of [
-    ['2026-07-19', '19/07/2026 - Semester starts in 1 day'],
-    ['2026-09-21', '21/09/2026 - Semester Break'],
-    ['2026-11-20', '20/11/2026 - Teaching complete'],
+    ['2026-07-19', '19/07/2026 · Semester starts in 1 day'],
+    ['2026-09-21', '21/09/2026 · Semester Break'],
+    ['2026-11-20', '20/11/2026 · Teaching complete'],
   ]) {
     const html = render(
       React.createElement(SemesterWeek, { semester: data.semester[0], now, data }),

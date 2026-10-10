@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current UI release: **V2.1.4**. See the [safe Acer update and verification guide](docs/V2.1.4-GUIDE.md).
+Current UI release: **V2.1.4.1**. See the [safe Acer update and verification guide](docs/V2.1.4.1-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -570,3 +570,14 @@ Cancel timer and its confirmations are removed from all active timer views. Paus
 Sidebar scrollbars are hidden with Firefox/Chromium/WebKit CSS while native scrolling and keyboard navigation remain enabled. Dashboard begins with its heading; Semester progress now shows `Semester name | DD/MM/YYYY - Week N/M` as one bold summary. Semester Break/resumption, before-start and teaching-complete states reuse the existing calculations. The shared Analytics summary uses the same format.
 
 SQLite, authentication, reminders, Web Push, To-dos, recurring tasks, backups, Windows startup and Tailscale are unchanged. Spotify and other new features are outside this release.
+
+
+## V2.1.4.1 semester progress and floating timer polish
+
+Semester progress now displays `Semester name | DD/MM/YYYY · Week N/M`. The existing special semester states and resumption information remain.
+
+The floating timer disappears in review after End; its redundant Ready to save/Review & save state is removed. Study review keeps actual minutes editing, quick note, Save session and Discard session. End does not save automatically.
+
+On phone/tablet, drag the small grip to snap into a safe corner. Tap it to cycle corners or use arrow keys when focused. Position is remembered locally per browser/origin and adjusts to rotation, safe areas, navigation and the keyboard's visible viewport. Desktop keeps its stable default. Pause/Resume/End remain separate buttons.
+
+See the [V2.1.4.1 backup-first Acer update and device-check guide](docs/V2.1.4.1-GUIDE.md). No migration, dependency, persistence, backup or infrastructure changes are included. Spotify remains outside this patch.

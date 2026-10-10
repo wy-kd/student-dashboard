@@ -17,7 +17,7 @@ export function SemesterWeek({
         <span>{semester.name}</span>
         <span aria-hidden="true">|</span>
         <span>
-          {formatDate(now)} -{' '}
+          {formatDate(now)} ·{' '}
           {info.state === 'teaching' ? `Week ${info.week}/${info.total}` : info.label}
         </span>
       </strong>

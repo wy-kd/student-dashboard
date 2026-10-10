@@ -55,9 +55,9 @@ test('app fullscreen is removed while Focus Mode and PWA standalone remain', () 
   assert.equal(typeof FocusMode, 'function');
   assert.match(readFileSync('app/globals.css', 'utf8'), /display-mode: standalone/);
 });
-test('dock renders distinct activity, status and clock for countdown/stopwatch running/paused/review', () => {
+test('dock renders distinct activity, status and clock for countdown/stopwatch running/paused', () => {
   for (const mode of ['countdown', 'stopwatch'])
-    for (const status of ['running', 'paused', 'review']) {
+    for (const status of ['running', 'paused']) {
       const html = render(React.createElement(MiniTimer), {
         id: 'fixture',
         name: 'Focused study',
@@ -77,12 +77,7 @@ test('dock renders distinct activity, status and clock for countdown/stopwatch r
       assert.match(html, /<strong>Focused study<\/strong><span class="mini-timer-status">/);
       assert.match(html, /class="mini-timer-clock"/);
       assert.match(html, /class="mini-timer-time" role="timer"/);
-      assert.match(
-        html,
-        new RegExp(
-          status === 'review' ? 'Review &amp; save' : status === 'paused' ? 'Resume' : 'Pause',
-        ),
-      );
+      assert.match(html, new RegExp(status === 'paused' ? 'Resume' : 'Pause'));
       assert.match(html, new RegExp(mode === 'stopwatch' ? 'Elapsed' : 'Remaining'));
     }
   assert.equal(render(React.createElement(MiniTimer)), '');

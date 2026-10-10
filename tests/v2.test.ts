@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { defaults } from '../lib/model';
 import { defaultLayout, moveWidget, layoutSchema } from '../lib/dashboard-layout';
 import { timerView } from '../lib/timer';
+import { floatingTimerVisible } from '../lib/floating-timer';
 import { weeklyReview } from '../lib/weekly-review';
 import { hashToken } from '../lib/auth';
 const fixture = mkdtempSync(join(tmpdir(), 'Student V2 fixture ')),
@@ -739,6 +740,7 @@ test('two authenticated timer clients receive start/pause/resume/finish/cancel i
     data: { id: hashToken(token), userId: 'owner', expiresAt: Date.now() + 60000 },
   });
   const headers = { cookie: 'student_session=' + token };
+  const sessionCount = await db.studySession.count();
   let current: any = null;
   for (const action of [
     'timer.start',
@@ -787,6 +789,13 @@ test('two authenticated timer clients receive start/pause/resume/finish/cancel i
       'both clients see the committed transition within two seconds',
     );
     assert.deepEqual(a.timer, b.timer);
+    if (action === 'timer.finish') {
+      assert.equal(a.timer.status, 'review');
+      assert.equal(b.timer.segmentAt, null);
+      assert.equal(floatingTimerVisible(a.timer), false);
+      assert.equal(floatingTimerVisible(b.timer), false);
+      assert.equal(await db.studySession.count(), sessionCount, 'End does not automatically save');
+    }
     current = a.timer;
     if (action === 'timer.cancel') assert.equal(current, null);
     else assert.equal(current.revision, result.revision);

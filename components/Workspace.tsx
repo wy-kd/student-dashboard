@@ -18,7 +18,9 @@ import { Editor } from './Editor';
 import { AppSidebar, BottomNavigation } from './AppNavigation';
 import { useTimerSync } from './useTimerSync';
 import { useSidebarPreference } from './useSidebarPreference';
-import { MiniTimer, FocusMode } from './StudyTimer';
+import { FocusMode } from './StudyTimer';
+import { FloatingTimer } from './FloatingTimer';
+import { floatingTimerVisible } from '@/lib/floating-timer';
 import { Inbox, QuickCapture } from './Inbox';
 import { NotificationCentre } from './Notifications';
 import { WeeklyReview } from './DailyPlanning';
@@ -382,7 +384,9 @@ export function Workspace() {
           'app-shell ' +
           (route === 'focus' ? 'focus-shell ' : '') +
           (collapsed ? 'sidebar-collapsed ' : '') +
-          (allData.productivity?.timer && route !== 'focus' ? 'has-floating-timer' : '')
+          (floatingTimerVisible(allData.productivity?.timer) && route !== 'focus'
+            ? 'has-floating-timer'
+            : '')
         }
         data-density={allData.productivity?.preference?.density ?? 'Comfortable'}
       >
@@ -582,11 +586,7 @@ export function Workspace() {
               Your workspace · {allData.setting.timezone} · Connected to your laptop
             </footer>
           </main>
-          {route !== 'focus' && (
-            <div className="timer-float">
-              <MiniTimer />
-            </div>
-          )}
+          {route !== 'focus' && <FloatingTimer />}
         </div>
       </div>
       {route !== 'focus' && (

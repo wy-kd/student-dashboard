@@ -3376,3 +3376,44 @@ td:first-child {
     margin-left: auto;
   }
 }
+
+/* V2.1.4.1: device-local corners; only the handle captures touch dragging. */
+.timer-safe-area {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.timer-float[data-movable='true'] .mini-timer {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  row-gap: 8px;
+}
+.timer-drag-handle {
+  flex-basis: 100%;
+  flex-shrink: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.timer-drag-handle:hover,
+.timer-drag-handle:focus-visible {
+  background: var(--surface2);
+}
+.timer-float[data-dragging='true'] .timer-drag-handle {
+  cursor: grabbing;
+}
+
+.timer-float[data-movable='true'] .mini-timer-controls {
+  flex-wrap: wrap;
+}

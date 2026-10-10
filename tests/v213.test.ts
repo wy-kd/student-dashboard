@@ -114,7 +114,7 @@ test('semester identity and teaching state share a bold summary in every state',
           now.slice(5, 7) +
           '/' +
           now.slice(0, 4) +
-          ' - ' +
+          ' · ' +
           expected +
           '</span></strong>',
       ),

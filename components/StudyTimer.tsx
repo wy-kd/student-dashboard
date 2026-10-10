@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useProductivity } from './productivity';
 import { timerView, clockText } from '@/lib/timer';
 import { SubjectTag } from './ui';
+import { floatingTimerVisible } from '@/lib/floating-timer';
 export function StudyTimer({
   compact = false,
   focus = false,
@@ -306,7 +307,7 @@ export function StudyTimer({
     </div>
   );
 }
-export function MiniTimer() {
+export function MiniTimer({ dragHandle }: { dragHandle?: ReactNode }) {
   const { state, go, act, notify } = useProductivity(),
     t = state?.timer;
   const [now, setNow] = useState(Date.now());
@@ -321,7 +322,7 @@ export function MiniTimer() {
     const interval = setInterval(() => setNow(Date.now() + offset.current), 1000);
     return () => clearInterval(interval);
   }, [t?.id]);
-  if (!t) return null;
+  if (!floatingTimerVisible(t)) return null;
   const v = timerView(t, now);
   async function run(action: string) {
     setBusy(true);
@@ -336,19 +337,18 @@ export function MiniTimer() {
   }
   return (
     <aside className="mini-timer" aria-label="Active study timer" data-state={t.status}>
+      {dragHandle}
       <button className="mini-timer-summary" onClick={() => go('/focus')} title="Open Focus Mode">
         <span className="mini-timer-title">
           <strong>{t.name}</strong>
           <span className="mini-timer-status">
-            {t.status === 'review'
-              ? 'Ready to save'
-              : t.status === 'paused'
-                ? 'Paused'
-                : v.complete
-                  ? 'Round complete'
-                  : t.phase === 'break'
-                    ? 'Break running'
-                    : 'Running'}
+            {t.status === 'paused'
+              ? 'Paused'
+              : v.complete
+                ? 'Round complete'
+                : t.phase === 'break'
+                  ? 'Break running'
+                  : 'Running'}
           </span>
         </span>
         <span className="mini-timer-clock">
@@ -361,26 +361,18 @@ export function MiniTimer() {
         </span>
       </button>
       <div className="mini-timer-controls">
-        {t.status === 'review' ? (
-          <button className="button primary" onClick={() => go('/study')}>
-            Review & save
+        {!v.complete && (
+          <button
+            className="button secondary"
+            disabled={busy}
+            onClick={() => run(t.status === 'paused' ? 'timer.resume' : 'timer.pause')}
+          >
+            {t.status === 'paused' ? 'Resume' : 'Pause'}
           </button>
-        ) : (
-          <>
-            {!v.complete && (
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => run(t.status === 'paused' ? 'timer.resume' : 'timer.pause')}
-              >
-                {t.status === 'paused' ? 'Resume' : 'Pause'}
-              </button>
-            )}
-            <button className="button primary" disabled={busy} onClick={() => run('timer.finish')}>
-              End
-            </button>
-          </>
         )}
+        <button className="button primary" disabled={busy} onClick={() => run('timer.finish')}>
+          End
+        </button>
       </div>
     </aside>
   );

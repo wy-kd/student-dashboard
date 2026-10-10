@@ -7,7 +7,9 @@ import { Dashboard } from '../components/Dashboard';
 import { Tasks, Subjects, Assessments, Detail } from '../components/Records';
 import { Calendar, Study, Grades, Analytics } from '../components/Planning';
 import { Settings } from '../components/Settings';
-import { FocusMode, MiniTimer } from '../components/StudyTimer';
+import { FocusMode } from '../components/StudyTimer';
+import { FloatingTimer } from '../components/FloatingTimer';
+import { floatingTimerVisible } from '../lib/floating-timer';
 import { Inbox } from '../components/Inbox';
 import { NotificationCentre } from '../components/Notifications';
 import { WeeklyReview } from '../components/DailyPlanning';
@@ -354,7 +356,9 @@ function Harness() {
             'app-shell ' +
             (collapsed ? 'sidebar-collapsed ' : '') +
             (route === 'Focus' ? 'focus-shell' : '') +
-            (timer && route !== 'Focus' ? ' has-floating-timer' : '')
+            (floatingTimerVisible(data.productivity.timer) && route !== 'Focus'
+              ? ' has-floating-timer'
+              : '')
           }
           data-density={density}
         >
@@ -385,11 +389,7 @@ function Harness() {
             <main id="main" tabIndex={-1}>
               {pages[route]}
             </main>
-            {timer && route !== 'Focus' && (
-              <div className="timer-float">
-                <MiniTimer />
-              </div>
-            )}
+            {timer && route !== 'Focus' && <FloatingTimer />}
           </div>
         </div>
         {route !== 'Focus' && (
