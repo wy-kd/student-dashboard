@@ -24,7 +24,6 @@ import {
   type Layout,
 } from '@/lib/dashboard-layout';
 import { SemesterWeek } from './SemesterWeek';
-import { teachingWeekInfo } from '@/lib/teaching-weeks';
 import { StudyTimer } from './StudyTimer';
 import { TodoList } from './TodoList';
 import { Today, WeeklySummary } from './DailyPlanning';
@@ -357,10 +356,6 @@ function WidgetDashboard() {
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {formatDate(today)}
-            {semester ? ' · ' + teachingWeekInfo(semester, now, d).label : ''}
-          </p>
           <h1>Dashboard</h1>
         </div>
         <button

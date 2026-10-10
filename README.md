@@ -1,5 +1,7 @@
 # Student Dashboard
 
+Current UI release: **V2.1.4**. See the [safe Acer update and verification guide](docs/V2.1.4-GUIDE.md).
+
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
 A personal university workspace for subjects, assessment tasks, exams, classes, study planning and grades. Next.js, React, TypeScript, Tailwind CSS, Prisma and a local SQLite database. No cloud account, AI API, subscription or hosted database is needed to use it.
@@ -557,3 +559,14 @@ This release removes duplicate native-input date hints, fixes timetable date-hea
 Tasks now includes a separate lightweight To-do list, with optional due dates, completion, inline editing and manual order. Enable its five-item preview under Dashboard → Edit Dashboard → Add Widget → To-do list. Existing dashboard layouts are retained and the new widget starts hidden.
 
 The only schema change is additive migration `202609080001_todos`, creating `TodoItem` and its index. Existing startup/install migration behaviour applies it; no existing table or academic record is replaced. JSON backup/restore includes To-dos and still accepts older backups. Authentication, timer sync, reminders, Web Push, Windows startup and Tailscale are unchanged. No dependency or Spotify integration is added.
+
+
+## V2.1.4 timer, sidebar and Dashboard cleanup
+
+See the [V2.1.4 backup-first Acer update guide](docs/V2.1.4-GUIDE.md) for exact commands and device checks. No database migration or dependency is added.
+
+Cancel timer and its confirmations are removed from all active timer views. Pause/Resume and End retain their existing behaviour and sync. End opens review, where Save session or Discard session use the existing persistence/cleanup actions. Cancellation-only client code and styles are removed; internal cleanup and duplicate-save protection remain.
+
+Sidebar scrollbars are hidden with Firefox/Chromium/WebKit CSS while native scrolling and keyboard navigation remain enabled. Dashboard begins with its heading; Semester progress now shows `Semester name | DD/MM/YYYY - Week N/M` as one bold summary. Semester Break/resumption, before-start and teaching-complete states reuse the existing calculations. The shared Analytics summary uses the same format.
+
+SQLite, authentication, reminders, Web Push, To-dos, recurring tasks, backups, Windows startup and Tailscale are unchanged. Spotify and other new features are outside this release.

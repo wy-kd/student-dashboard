@@ -158,6 +158,8 @@ test('countdown pause/resume and recovery use timestamps; completion saves once 
     { action: 'timer.finish', id: t.id, revision: t.revision },
     base + 95 * 60000,
   );
+  assert.equal(t.status, 'review', 'End enters the existing session review flow');
+  assert.equal(t.segmentAt, null, 'End stops accumulating time');
   assert.equal(t.focusMs, 35 * 60000);
   const command = {
     action: 'timer.save',
@@ -216,6 +218,37 @@ test('stopwatch, start retry, stale device commands and cancel retain one active
   );
   assert.equal(await db.studyTimer.count({ where: { activeKey: 'owner' } }), 0);
   assert.equal(await db.studySession.count(), sessionCount, 'cancel never records study time');
+});
+test('discarding an ended session clears the review without saving study time', async () => {
+  const count = await db.studySession.count();
+  let t = await timerAction(
+    'owner',
+    {
+      action: 'timer.start',
+      timer: {
+        requestId: randomUUID(),
+        name: 'Review discard fixture',
+        mode: 'stopwatch',
+        focusMinutes: 50,
+        breakMinutes: 10,
+        rounds: 1,
+      },
+    },
+    base,
+  );
+  t = await timerAction(
+    'owner',
+    { action: 'timer.finish', id: t.id, revision: t.revision },
+    base + 60000,
+  );
+  assert.equal(t.status, 'review');
+  await timerAction(
+    'owner',
+    { action: 'timer.cancel', id: t.id, revision: t.revision },
+    base + 60000,
+  );
+  assert.equal((await productivitySnapshot('owner')).timer, null);
+  assert.equal(await db.studySession.count(), count);
 });
 test('reminders deduplicate missed offsets, recover after restart, reschedule and cancel completed records', async () => {
   await reconcileReminders('owner', base);

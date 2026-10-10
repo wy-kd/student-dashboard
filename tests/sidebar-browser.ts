@@ -14,11 +14,34 @@ export async function checkSidebar() {
     new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
+  const checkScrolling = async () => {
+    const nav = get('.sidebar nav');
+    const style = getComputedStyle(nav);
+    assert(style.overflowY === 'auto', 'Navigation must retain native vertical scrolling.');
+    assert(style.scrollbarWidth === 'none', 'Navigation scrollbar must be hidden.');
+    if (nav.scrollHeight > nav.clientHeight) {
+      nav.scrollTop = nav.scrollHeight;
+      assert(nav.scrollTop > 0, 'Short-screen navigation must scroll.');
+    }
+    for (const link of nav.querySelectorAll<HTMLAnchorElement>('a')) {
+      link.focus();
+      await paint();
+      const item = link.getBoundingClientRect(),
+        viewport = nav.getBoundingClientRect();
+      assert(document.activeElement === link, 'Every navigation item must remain focusable.');
+      assert(
+        item.top >= viewport.top - 1 && item.bottom <= viewport.bottom + 1,
+        'Keyboard focus must reveal every navigation item.',
+      );
+    }
+    nav.scrollTop = 0;
+  };
   const toggle = () => get('.sidebar-toggle');
   if (toggle().getAttribute('aria-expanded') === 'false') {
     toggle().click();
     await paint();
   }
+  await checkScrolling();
   const expandedWidth = get('.sidebar').getBoundingClientRect().width;
   const expandedMain = get('.main-shell').getBoundingClientRect().width;
   toggle().click();
@@ -35,6 +58,7 @@ export async function checkSidebar() {
     localStorage.getItem('student-sidebar-collapsed') === 'true',
     'Collapsed choice must be saved.',
   );
+  await checkScrolling();
   get('.sidebar a[href="/tasks"]').click();
   await paint();
   assert(get('.sidebar').getBoundingClientRect().width === 76, 'Navigation must retain collapse.');
@@ -53,5 +77,5 @@ export async function checkSidebar() {
     localStorage.getItem('student-sidebar-collapsed') === 'false',
     'Expanded choice must be saved.',
   );
-  return 'Navigation checks passed: collapse, content width, navigation, active icon, expand and saved choices.';
+  return 'Navigation checks passed: hidden scrollbar, scrolling, every link focusable/reachable, collapse, content width, navigation, active icon, expand and saved choices.';
 }

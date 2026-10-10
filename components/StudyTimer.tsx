@@ -228,9 +228,19 @@ export function StudyTimer({
         <p className="muted">
           Saved once in Study sessions. Manual task and assessment hours stay separate.
         </p>
-        <button className="button primary" disabled={busy}>
-          Save session
-        </button>
+        <div className="timer-actions">
+          <button className="button primary" disabled={busy}>
+            Save session
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={busy}
+            onClick={() => run('timer.cancel')}
+          >
+            Discard session
+          </button>
+        </div>
       </form>
     );
   return (
@@ -283,33 +293,18 @@ export function StudyTimer({
           </button>
         )}
         <button className="button primary" disabled={busy} onClick={() => run('timer.finish')}>
-          Finish
+          End
         </button>
       </div>
-      <div className="inline">
-        {!focus && (
+      {!focus && (
+        <div className="inline">
           <button className="text-button" onClick={() => go('/focus')}>
             Open Focus Mode
           </button>
-        )}
-        <button
-          className="text-button muted"
-          disabled={busy}
-          onClick={() => {
-            if (confirm('Cancel this timer without recording study time?')) run('timer.cancel');
-          }}
-        >
-          Cancel timer
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
-}
-export async function requestTimerCancellation(
-  discard: () => Promise<void>,
-  confirmDiscard: (message: string) => boolean = (message) => window.confirm(message),
-) {
-  if (confirmDiscard('Cancel this timer session? Elapsed time will not be saved.')) await discard();
 }
 export function MiniTimer() {
   const { state, go, act, notify } = useProductivity(),
@@ -387,14 +382,6 @@ export function MiniTimer() {
           </>
         )}
       </div>
-      <button
-        type="button"
-        className="text-button mini-timer-cancel"
-        disabled={busy}
-        onClick={() => void requestTimerCancellation(() => run('timer.cancel'))}
-      >
-        Cancel timer
-      </button>
     </aside>
   );
 }

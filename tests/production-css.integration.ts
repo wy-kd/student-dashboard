@@ -23,6 +23,9 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.calendar\.day \.day-label b[^}]*width:auto/);
   assert.match(css, /\.semester-summary\{[^}]*font-weight:700/);
   assert.match(css, /\.todo-add-line\{[^}]*gap:10px/);
-  assert.match(css, /\.mini-timer-cancel\{[^}]*min-height:44px/);
+  assert.match(css, /\.sidebar nav\{[^}]*scrollbar-width:none/);
+  assert.match(css, /\.sidebar nav\{[^}]*overflow-y:auto/);
+  assert.match(css, /\.sidebar nav::?-webkit-scrollbar\{[^}]*display:none/);
+  assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

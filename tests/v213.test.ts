@@ -12,7 +12,6 @@ import { Calendar } from '../components/Planning';
 import { SemesterWeek } from '../components/SemesterWeek';
 import { TodoList } from '../components/TodoList';
 import { Tasks } from '../components/Records';
-import { MiniTimer, requestTimerCancellation } from '../components/StudyTimer';
 import { entities, type Data, type RecordRow } from '../lib/model';
 import { defaultLayout, readLayout, layoutSchema } from '../lib/dashboard-layout';
 
@@ -102,7 +101,7 @@ test('timetable renders one full date per weekday header and retains today and n
 test('semester identity and teaching state share a bold summary in every state', () => {
   for (const [now, expected] of [
     ['2026-09-02', 'Semester starts in 5 days'],
-    ['2026-09-08', 'Week 1 of 2'],
+    ['2026-09-08', 'Week 1/2'],
     ['2026-09-15', 'Semester Break'],
     ['2026-10-01', 'Teaching complete'],
   ]) {
@@ -110,6 +109,12 @@ test('semester identity and teaching state share a bold summary in every state',
     assert.ok(
       html.includes(
         '<strong class="semester-summary"><span>QUT Y1S2</span><span aria-hidden="true">|</span><span>' +
+          now.slice(8, 10) +
+          '/' +
+          now.slice(5, 7) +
+          '/' +
+          now.slice(0, 4) +
+          ' - ' +
           expected +
           '</span></strong>',
       ),
@@ -151,42 +156,6 @@ test('saved dashboard layouts gain only missing hidden widgets and keep existing
   assert.equal(extended.desktop.at(-1)?.hidden, true);
   assert.deepEqual(readLayout(JSON.stringify(extended)), extended);
   assert.doesNotThrow(() => layoutSchema.parse(extended));
-});
-test('floating Cancel requires confirmation while End retains review', async () => {
-  let calls = 0,
-    message = '';
-  const discard = async () => {
-    calls++;
-  };
-  await requestTimerCancellation(discard, (text) => {
-    message = text;
-    return false;
-  });
-  assert.equal(calls, 0);
-  assert.match(message, /Elapsed time will not be saved/);
-  await requestTimerCancellation(discard, () => true);
-  assert.equal(calls, 1);
-  const d = data();
-  d.productivity.timer = {
-    id: 't',
-    revision: 0,
-    name: 'Reading',
-    mode: 'stopwatch',
-    status: 'running',
-    phase: 'focus',
-    startedAt: Date.now(),
-    segmentAt: Date.now(),
-    elapsedMs: 0,
-    focusMs: 0,
-    focusMinutes: 50,
-    breakMinutes: 10,
-    rounds: 1,
-    round: 1,
-  };
-  const html = render(React.createElement(MiniTimer), d);
-  assert.match(html, />Pause</);
-  assert.match(html, />End</);
-  assert.match(html, />Cancel timer</);
 });
 test('additive to-do migration preserves the existing database rows and credentials', () => {
   const db = new DatabaseSync(':memory:');
