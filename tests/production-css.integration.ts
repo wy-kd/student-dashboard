@@ -26,9 +26,12 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.sidebar nav\{[^}]*scrollbar-width:none/);
   assert.match(css, /\.sidebar nav\{[^}]*overflow-y:auto/);
   assert.match(css, /\.sidebar nav::?-webkit-scrollbar\{[^}]*display:none/);
-  assert.match(css, /\.timer-drag-handle\{[^}]*touch-action:none/);
-  assert.match(css, /\.timer-safe-area\{[^}]*safe-area-inset-top/);
-  assert.match(css, /data-movable[^}]*max-height:inherit/);
+  assert.match(css, /\.timer-float\{[^}]*timer-sidebar-width/);
+  assert.match(css, /\.timer-float\{[^}]*timer-keyboard-inset/);
+  assert.match(css, /\.timer-float \.mini-timer\{[^}]*max-height:inherit/);
+  assert.match(css, /\.study-duration-fields\{[^}]*grid-template-columns:repeat\(2/);
+  assert.match(css, /\.dashboard-context\{[^}]*margin:0 0 8px/);
+  assert.doesNotMatch(css, /timer-drag|timer-safe-area|data-movable|data-dragging/);
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

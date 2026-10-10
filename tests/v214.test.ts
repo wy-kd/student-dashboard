@@ -115,30 +115,35 @@ test('ended timer exposes review with Save and Discard only in the main review f
   assert.equal(mini, '');
   assert.doesNotMatch(mini, /Cancel|Discard|Pause|Resume|>End</);
 });
-test('Dashboard begins with its heading and moves one date/week summary into Semester progress', () => {
+test('Dashboard restores a muted date/week heading and separate semester identity/state', () => {
   const html = render(React.createElement(Dashboard));
-  assert.match(html, /^<div class="page-heading"><div><h1>Dashboard<\/h1><\/div>/);
+  assert.match(
+    html,
+    /^<div class="page-heading"><div><p class="dashboard-context muted">11\/10\/2026 · Week 11 of 13<\/p><h1>Dashboard<\/h1>/,
+  );
   assert.match(html, /Semester progress/);
   assert.match(
     html,
-    /QUT Y1S2<\/span><span aria-hidden="true">\|<\/span><span>11\/10\/2026 · Week 11\/13<\/span>/,
+    /<strong class="semester-summary">QUT Y1S2<\/strong><p class="semester-state">Week 11 of 13<\/p>/,
   );
   assert.equal((html.match(/11\/10\/2026/g) ?? []).length, 1);
-  assert.equal((html.match(/Week 11\/13/g) ?? []).length, 1);
-  assert.doesNotMatch(html, /Week 11 of 13|11\/10\/2026 - Week/);
+  assert.equal((html.match(/Week 11 of 13/g) ?? []).length, 2);
+  assert.doesNotMatch(html, /Week 11\/13/);
 });
-test('dated semester summary preserves before, break/resumption and complete states', () => {
+test('shared semester calculation preserves before, break/resumption and complete states in both places', () => {
   const data = fixture();
   for (const [now, expected] of [
-    ['2026-07-19', '19/07/2026 · Semester starts in 1 day'],
-    ['2026-09-21', '21/09/2026 · Semester Break'],
-    ['2026-11-20', '20/11/2026 · Teaching complete'],
+    ['2026-07-19', 'Semester starts in 1 day'],
+    ['2026-09-21', 'Semester Break'],
+    ['2026-11-20', 'Teaching complete'],
   ]) {
     const html = render(
       React.createElement(SemesterWeek, { semester: data.semester[0], now, data }),
     );
     assert.ok(html.includes(expected));
-    assert.doesNotMatch(html, /Week \d+\/13|Week \d+ of 13/);
+    assert.doesNotMatch(html, /Week \d+ of 13|\d{2}\/\d{2}\/2026 ·/);
+    const heading = render(React.createElement(Dashboard), data, now);
+    assert.ok(heading.includes(' · ' + expected + '</p><h1>Dashboard'));
     if (now === '2026-09-21') assert.match(html, /Teaching Week 10 resumes 28\/09\/2026/);
   }
 });

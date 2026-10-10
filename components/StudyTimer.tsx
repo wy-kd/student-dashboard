@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProductivity } from './productivity';
 import { timerView, clockText } from '@/lib/timer';
 import { SubjectTag } from './ui';
+import { studyDurationParts, studyDurationMinutes } from '@/lib/study-duration';
 import { floatingTimerVisible } from '@/lib/floating-timer';
 export function StudyTimer({
   compact = false,
@@ -22,7 +23,9 @@ export function StudyTimer({
     [name, setName] = useState('Focused study'),
     [busy, setBusy] = useState(false),
     [note, setNote] = useState(''),
-    [minutes, setMinutes] = useState(''),
+    [hours, setHours] = useState(() => studyDurationParts(t?.focusMs ?? 0).hours),
+    [minutes, setMinutes] = useState(() => studyDurationParts(t?.focusMs ?? 0).minutes),
+    [durationError, setDurationError] = useState(''),
     [complete, setComplete] = useState(false);
   const requestId = useRef<string | null>(null);
   const offset = useRef(0);
@@ -36,7 +39,10 @@ export function StudyTimer({
     return () => clearInterval(interval);
   }, [t?.id]);
   useEffect(() => {
-    setMinutes(t?.status === 'review' ? String(Math.round(t.focusMs / 600) / 100) : '');
+    const parts = studyDurationParts(t?.status === 'review' ? t.focusMs : 0);
+    setHours(parts.hours);
+    setMinutes(parts.minutes);
+    setDurationError('');
     setNote('');
     setComplete(false);
   }, [t?.id, t?.status]);
@@ -185,26 +191,60 @@ export function StudyTimer({
         className="study-timer"
         onSubmit={async (e) => {
           e.preventDefault();
-          await run('timer.save', {
-            completion: { minutes: Number(minutes), note, completeTask: complete },
-          });
+          try {
+            const totalMinutes = studyDurationMinutes(hours, minutes);
+            setDurationError('');
+            await run('timer.save', {
+              completion: { minutes: totalMinutes, note, completeTask: complete },
+            });
+          } catch (error) {
+            setDurationError((error as Error).message);
+          }
         }}
       >
         <h2>Session complete</h2>
         <p>{t.name}</p>
-        <label className="field">
-          Actual study minutes
-          <input
-            autoComplete="off"
-            type="number"
-            min={0}
-            max={1440}
-            step="any"
-            value={minutes}
-            required
-            onChange={(e) => setMinutes(e.target.value)}
-          />
-        </label>
+        <fieldset
+          className="study-duration"
+          aria-describedby={durationError ? 'study-duration-error' : undefined}
+        >
+          <legend>Actual study time</legend>
+          <div className="study-duration-fields">
+            <label className="field">
+              Hours
+              <input
+                autoComplete="off"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={24}
+                step={1}
+                value={hours}
+                required
+                onChange={(e) => setHours(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              Minutes
+              <input
+                autoComplete="off"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={59}
+                step={1}
+                value={minutes}
+                required
+                onChange={(e) => setMinutes(e.target.value)}
+              />
+            </label>
+          </div>
+          {durationError && (
+            <p id="study-duration-error" role="alert">
+              {durationError}
+            </p>
+          )}
+        </fieldset>
         {task && task.status !== 'Completed' && (
           <label className="check-label">
             <input
@@ -307,7 +347,7 @@ export function StudyTimer({
     </div>
   );
 }
-export function MiniTimer({ dragHandle }: { dragHandle?: ReactNode }) {
+export function MiniTimer() {
   const { state, go, act, notify } = useProductivity(),
     t = state?.timer;
   const [now, setNow] = useState(Date.now());
@@ -337,7 +377,6 @@ export function MiniTimer({ dragHandle }: { dragHandle?: ReactNode }) {
   }
   return (
     <aside className="mini-timer" aria-label="Active study timer" data-state={t.status}>
-      {dragHandle}
       <button className="mini-timer-summary" onClick={() => go('/focus')} title="Open Focus Mode">
         <span className="mini-timer-title">
           <strong>{t.name}</strong>

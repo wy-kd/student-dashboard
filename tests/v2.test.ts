@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { defaults } from '../lib/model';
 import { defaultLayout, moveWidget, layoutSchema } from '../lib/dashboard-layout';
 import { timerView } from '../lib/timer';
+import { studyDurationParts, studyDurationMinutes } from '../lib/study-duration';
 import { floatingTimerVisible } from '../lib/floating-timer';
 import { weeklyReview } from '../lib/weekly-review';
 import { hashToken } from '../lib/auth';
@@ -181,6 +182,63 @@ test('countdown pause/resume and recovery use timestamps; completion saves once 
     0,
   );
   assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'Completed');
+});
+test('review duration uses authoritative early countdown/stopwatch time excluding pauses and saves once', async () => {
+  for (const [mode, activeMinutes] of [
+    ['countdown', 35],
+    ['stopwatch', 83],
+  ] as const) {
+    const count = await db.studySession.count();
+    let t = await timerAction(
+      'owner',
+      {
+        action: 'timer.start',
+        timer: {
+          requestId: randomUUID(),
+          name: 'Duration fixture',
+          mode,
+          focusMinutes: 50,
+          breakMinutes: 10,
+          rounds: 1,
+        },
+      },
+      base,
+    );
+    t = await timerAction(
+      'owner',
+      { action: 'timer.pause', id: t.id, revision: t.revision },
+      base + 10 * 60000,
+    );
+    t = await timerAction(
+      'owner',
+      { action: 'timer.resume', id: t.id, revision: t.revision },
+      base + 70 * 60000,
+    );
+    const end = base + (70 + activeMinutes - 10) * 60000;
+    t = await timerAction('owner', { action: 'timer.finish', id: t.id, revision: t.revision }, end);
+    assert.equal(t.focusMs, activeMinutes * 60000);
+    assert.equal(await db.studySession.count(), count, 'End does not auto-save');
+    const parts = studyDurationParts(t.focusMs);
+    const command = {
+      action: 'timer.save',
+      id: t.id,
+      revision: t.revision,
+      completion: {
+        minutes: studyDurationMinutes(parts.hours, parts.minutes),
+        note: 'Duration input fixture',
+        completeTask: false,
+      },
+    };
+    const saved = await timerAction('owner', command, end);
+    await timerAction('owner', command, end);
+    assert.equal(await db.studySession.count(), count + 1);
+    const session = await db.studySession.findUniqueOrThrow({ where: { id: saved.sessionId! } });
+    assert.ok(
+      Math.abs(session.actualHours - activeMinutes / 60) < 1e-12,
+      'SQLite numeric precision retains the intended duration',
+    );
+    assert.equal(session.notes, 'Duration input fixture');
+  }
 });
 test('stopwatch, start retry, stale device commands and cancel retain one active timer', async () => {
   const sessionCount = await db.studySession.count();

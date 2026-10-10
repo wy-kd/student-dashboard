@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current UI release: **V2.1.4.1**. See the [safe Acer update and verification guide](docs/V2.1.4.1-GUIDE.md).
+Current UI release: **V2.1.4.2**. See the [backup-first Acer update and recovery guide](docs/V2.1.4.2-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -581,3 +581,13 @@ The floating timer disappears in review after End; its redundant Ready to save/R
 On phone/tablet, drag the small grip to snap into a safe corner. Tap it to cycle corners or use arrow keys when focused. Position is remembered locally per browser/origin and adjusts to rotation, safe areas, navigation and the keyboard's visible viewport. Desktop keeps its stable default. Pause/Resume/End remain separate buttons.
 
 See the [V2.1.4.1 backup-first Acer update and device-check guide](docs/V2.1.4.1-GUIDE.md). No migration, dependency, persistence, backup or infrastructure changes are included. Spotify remains outside this patch.
+
+## V2.1.4.2 fixed timer and study review correction
+
+The floating timer is fixed at the lower right, with phone bottom-navigation/safe-area clearance. Dragging, grip, snapping and position preferences are removed. End still hides it completely and opens Study review; Pause/Resume, cross-device synchronisation, Save/Discard and save-once protection remain unchanged.
+
+Review uses labelled whole-number Hours and Minutes. Its initial value rounds authoritative active-study milliseconds to the nearest minute (30 seconds rounds up), then splits into hours/remainder minutes. Under 30 seconds displays zero, preserving the existing zero-duration allowance. Hours are 0–24, minutes 0–59, and total time cannot exceed 1,440 minutes. Existing saved records and millisecond timer accounting are unchanged.
+
+Dashboard again shows `DD/MM/YYYY · Week N of M` above its heading. Semester Progress shows the semester name and `Week N of M` on separate lines, with no summary date; existing special states/resumption and progress bar remain.
+
+See the [V2.1.4.2 guide](docs/V2.1.4.2-GUIDE.md) for exact backup, verification, update, recovery and device checks. No migration, dependency, authentication, backup-format, PWA, Windows or Tailscale changes. Spotify remains outside this release.

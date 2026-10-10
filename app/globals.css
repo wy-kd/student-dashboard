@@ -3377,43 +3377,96 @@ td:first-child {
   }
 }
 
-/* V2.1.4.1: device-local corners; only the handle captures touch dragging. */
-.timer-safe-area {
-  position: fixed;
-  visibility: hidden;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-    env(safe-area-inset-bottom) env(safe-area-inset-left);
+/* V2.1.4.2: fixed utility, constrained to the space beside navigation. */
+.app-shell {
+  --timer-sidebar-width: 236px;
+  --timer-bottom: max(20px, env(safe-area-inset-bottom));
 }
-.timer-float[data-movable='true'] .mini-timer {
+@media (min-width: 1550px) {
+  .app-shell {
+    --timer-sidebar-width: 255px;
+  }
+}
+@media (max-width: 1150px) {
+  .app-shell {
+    --timer-sidebar-width: 210px;
+  }
+}
+@media (min-width: 801px) {
+  .sidebar-collapsed {
+    --timer-sidebar-width: 76px;
+  }
+}
+@media (max-width: 800px) {
+  .app-shell {
+    --timer-sidebar-width: 0px;
+  }
+}
+@media (max-width: 767px) {
+  .app-shell {
+    --timer-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
+.timer-float {
+  z-index: 41;
+  width: min(
+    360px,
+    calc(
+      100% - var(--timer-sidebar-width, 0px) - max(20px, env(safe-area-inset-right)) -
+        max(20px, env(safe-area-inset-left))
+    )
+  );
+  bottom: calc(var(--timer-bottom, 20px) + var(--timer-keyboard-inset, 0px));
+  max-height: calc(
+    var(--timer-visible-height, 100dvh) - var(--timer-bottom, 20px) -
+      max(12px, env(safe-area-inset-top))
+  );
+}
+.timer-float .mini-timer {
   max-height: inherit;
   overflow-y: auto;
   overscroll-behavior: contain;
-  row-gap: 8px;
 }
-.timer-drag-handle {
-  flex-basis: 100%;
-  flex-shrink: 0;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  border-radius: 6px;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
+.timer-float .mini-timer-controls {
+  flex-wrap: wrap;
 }
-.timer-drag-handle:hover,
-.timer-drag-handle:focus-visible {
-  background: var(--surface2);
+.page-heading p.dashboard-context {
+  font-size: 0.875rem;
+  margin: 0 0 8px;
 }
-.timer-float[data-dragging='true'] .timer-drag-handle {
-  cursor: grabbing;
+.semester-week .semester-summary {
+  display: block;
+}
+.semester-state {
+  font-weight: 600;
+  margin: 8px 0 16px;
+}
+.study-duration {
+  width: min(100%, 360px);
+  text-align: left;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.study-duration legend {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.study-duration-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.study-duration-fields input {
+  width: 100%;
+  min-width: 0;
 }
 
-.timer-float[data-movable='true'] .mini-timer-controls {
-  flex-wrap: wrap;
+/* On narrow phones the modal navigation drawer needs the available width.
+   Closing it restores the fixed card; the timer itself continues unchanged. */
+@media (max-width: 600px) {
+  .app-shell:has(.sidebar.open) .timer-float {
+    visibility: hidden;
+  }
 }

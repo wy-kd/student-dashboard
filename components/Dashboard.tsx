@@ -1,4 +1,5 @@
 'use client';
+import { teachingWeekInfo } from '@/lib/teaching-weeks';
 import { formatDate, formatTime } from '@/lib/format';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { GripVertical, MoveDownRight, ArrowUp, ArrowDown, EyeOff } from 'lucide-react';
@@ -356,6 +357,10 @@ function WidgetDashboard() {
     <>
       <div className="page-heading">
         <div>
+          <p className="dashboard-context muted">
+            {formatDate(now)}
+            {semester ? ` · ${teachingWeekInfo(semester, now, d).label}` : ''}
+          </p>
           <h1>Dashboard</h1>
         </div>
         <button

@@ -101,24 +101,13 @@ test('timetable renders one full date per weekday header and retains today and n
 test('semester identity and teaching state share a bold summary in every state', () => {
   for (const [now, expected] of [
     ['2026-09-02', 'Semester starts in 5 days'],
-    ['2026-09-08', 'Week 1/2'],
+    ['2026-09-08', 'Week 1 of 2'],
     ['2026-09-15', 'Semester Break'],
     ['2026-10-01', 'Teaching complete'],
   ]) {
     const html = render(React.createElement(SemesterWeek, { semester, now, data: data() }));
-    assert.ok(
-      html.includes(
-        '<strong class="semester-summary"><span>QUT Y1S2</span><span aria-hidden="true">|</span><span>' +
-          now.slice(8, 10) +
-          '/' +
-          now.slice(5, 7) +
-          '/' +
-          now.slice(0, 4) +
-          ' · ' +
-          expected +
-          '</span></strong>',
-      ),
-    );
+    assert.ok(html.includes('<strong class="semester-summary">QUT Y1S2</strong>'));
+    assert.ok(html.includes('<p class="semester-state">' + expected + '</p>'));
     if (expected === 'Semester Break') assert.match(html, /Teaching Week 2 resumes 21\/09\/2026/);
   }
 });
