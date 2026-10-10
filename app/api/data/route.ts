@@ -18,10 +18,11 @@ export async function POST(req: NextRequest) {
     sameOrigin(req);
     const session = await requireAuth(req);
     const b = await jsonBody(req);
+    let row;
     if (b.entity === 'setting') await saveSettings(b.data);
-    else await saveRow(entitySchema.parse(b.entity), b.data, b.id, b.revision);
+    else row = await saveRow(entitySchema.parse(b.entity), b.data, b.id, b.revision, b.requestId);
     await reconcileReminders(session.userId);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, row });
   } catch (e) {
     return errorResponse(e);
   }

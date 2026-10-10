@@ -1,6 +1,9 @@
 'use client';
 import { formatDate, formatTime } from '@/lib/format';
 import { Pencil, Trash2, Plus, ArrowUpRight, Check } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useProductivity } from './productivity';
+import { todoRequestId } from '@/lib/todo-request-id';
 import { useApp, subjectName } from './context';
 import { fields, type Entity, type RecordRow } from '@/lib/model';
 import { assignmentProgress, examProgress, countdown } from '@/lib/calculations';
@@ -125,7 +128,9 @@ export function Due({ at, exam = false }: { at: string; exam?: boolean }) {
   return <span className={at < now ? 'due overdue' : 'due'}>{countdown(at, now, exam)}</span>;
 }
 export function TaskRow({ row }: { row: RecordRow }) {
-  const { save, notify, allData } = useApp();
+  const { save, notify, allData, go, act } = useProductivity();
+  const requestId = useRef<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const completed = row.status === 'Completed';
   return (
     <div className={'task-row ' + (completed ? 'is-done' : '')}>
@@ -145,13 +150,57 @@ export function TaskRow({ row }: { row: RecordRow }) {
         <div className="metadata">
           <SubjectTag id={row.subjectId} />
           {completed ? <Badge>Completed</Badge> : row.dueAt && <Due at={row.dueAt} />}
-          <span>{row.estimatedHours}h</span>
+          <span>{row.estimatedHours ? `${row.estimatedHours}h estimated` : 'No estimate'}</span>
+          {row.dueAt && (
+            <span>
+              {formatDate(row.dueAt)} · {formatTime(row.dueAt)}
+            </span>
+          )}
           {row.assignmentId && (
-            <span>{allData.assignment.find((a) => a.id === row.assignmentId)?.name}</span>
+            <button
+              className="text-button task-parent"
+              onClick={() => go('/assignments/' + row.assignmentId)}
+              aria-label={
+                'Open assignment ' + allData.assignment.find((a) => a.id === row.assignmentId)?.name
+              }
+            >
+              {allData.assignment.find((a) => a.id === row.assignmentId)?.name}
+            </button>
           )}
         </div>
       </div>
       <Badge>{row.priority}</Badge>
+      {!completed && (
+        <button
+          className="button secondary task-focus"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            requestId.current ??= todoRequestId();
+            try {
+              await act('timer.start', {
+                timer: {
+                  requestId: requestId.current,
+                  name: row.name,
+                  taskId: row.id,
+                  mode: 'countdown',
+                  focusMinutes: 50,
+                  breakMinutes: 10,
+                  rounds: 1,
+                },
+              });
+              requestId.current = null;
+              go('/focus');
+            } catch (e: any) {
+              notify(e.message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Focus
+        </button>
+      )}
       <RecordActions entity="task" row={row} />
     </div>
   );

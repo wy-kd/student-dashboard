@@ -146,19 +146,42 @@ export function Workspace() {
     const t = setTimeout(() => setToast(''), 7000);
     return () => clearTimeout(t);
   }, [toast]);
-  async function mutate(entity: Entity, values: Record<string, any>, old?: RecordRow) {
+  async function mutate(
+    entity: Entity,
+    values: Record<string, any>,
+    old?: RecordRow,
+    requestId?: string,
+  ) {
     const input = Object.fromEntries(
-      fields[entity].map((f) => [f.key, values[f.key] ?? (f.type === 'checkbox' ? false : '')]),
+      fields[entity].map((f) => [
+        f.key,
+        entity === 'assignment' && f.type === 'number' && values[f.key] === ''
+          ? f.min && f.min > 0
+            ? f.default
+            : 0
+          : (values[f.key] ?? (f.type === 'checkbox' ? false : '')),
+      ]),
     );
     const res = await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entity, data: input, id: old?.id, revision: old?.revision }),
+      body: JSON.stringify({
+        entity,
+        data: input,
+        id: old?.id,
+        revision: old?.revision,
+        requestId,
+      }),
     });
     const b = await res.json();
     if (!res.ok) throw Error(b.error);
-    await reload();
-    notify('Saved.');
+    try {
+      await reload();
+      notify('Saved.');
+    } catch {
+      notify('Saved; reload the page to see the update.');
+    }
+    return b.row;
   }
   async function remove(entity: Entity, row: RecordRow) {
     const res = await fetch('/api/data', {

@@ -7,7 +7,12 @@ export type AppContextType = {
   allData: Data;
   now: string;
   open: (e: Editor) => void;
-  save: (e: Entity, row: Record<string, any>, old?: RecordRow) => Promise<void>;
+  save: (
+    e: Entity,
+    row: Record<string, any>,
+    old?: RecordRow,
+    requestId?: string,
+  ) => Promise<RecordRow | void>;
   remove: (e: Entity, row: RecordRow) => Promise<void>;
   reload: () => Promise<void>;
   notify: (s: string) => void;

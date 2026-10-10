@@ -122,10 +122,7 @@ test('Dashboard restores a muted date/week heading and separate semester identit
     /^<div class="page-heading"><div><p class="dashboard-context muted">11\/10\/2026 · Week 11 of 13<\/p><h1>Dashboard<\/h1>/,
   );
   assert.match(html, /Semester progress/);
-  assert.match(
-    html,
-    /<strong class="semester-summary">QUT Y1S2<\/strong><p class="semester-state">Week 11 of 13<\/p>/,
-  );
+  assert.match(html, /<strong class="semester-summary">QUT Y1S2 \| Week 11 of 13<\/strong>/);
   assert.equal((html.match(/11\/10\/2026/g) ?? []).length, 1);
   assert.equal((html.match(/Week 11 of 13/g) ?? []).length, 2);
   assert.doesNotMatch(html, /Week 11\/13/);

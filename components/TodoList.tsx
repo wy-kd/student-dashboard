@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useProductivity } from './productivity';
+import { TodoConversion } from './TodoConversion';
 import { DateTimeInput } from './DateTimeInput';
 import { formatDate } from '@/lib/format';
 import type { TodoRow } from '@/lib/todos';
@@ -19,6 +20,7 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
   const [editing, setEditing] = useState<{ old: TodoRow; name: string; dueDate: string } | null>(
     null,
   );
+  const [converting, setConverting] = useState<TodoRow | null>(null);
   const request = useRef<{ key: string; id: string } | null>(null);
   async function run(action: string, values: Record<string, unknown>, success?: () => void) {
     setBusy(true);
@@ -173,6 +175,15 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
                   <div className="todo-actions">
                     <button
                       type="button"
+                      className="text-button todo-convert"
+                      disabled={busy}
+                      onClick={() => setConverting(row)}
+                      aria-label={'Convert to Task ' + row.name}
+                    >
+                      Convert to Task
+                    </button>
+                    <button
+                      type="button"
                       className="text-button"
                       disabled={busy}
                       aria-label={'Edit to-do ' + row.name}
@@ -226,6 +237,7 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
           </li>
         ))}
       </ul>
+      {converting && <TodoConversion todo={converting} close={() => setConverting(null)} />}
       {compact && (
         <button
           type="button"

@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current UI release: **V2.1.4.2**. See the [backup-first Acer update and recovery guide](docs/V2.1.4.2-GUIDE.md).
+Current release: **V2.2 — Assignment Breakdown & Task Integration**. See the [backup-first Acer update, recovery and device guide](docs/V2.2-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -591,3 +591,13 @@ Review uses labelled whole-number Hours and Minutes. Its initial value rounds au
 Dashboard again shows `DD/MM/YYYY · Week N of M` above its heading. Semester Progress shows the semester name and `Week N of M` on separate lines, with no summary date; existing special states/resumption and progress bar remain.
 
 See the [V2.1.4.2 guide](docs/V2.1.4.2-GUIDE.md) for exact backup, verification, update, recovery and device checks. No migration, dependency, authentication, backup-format, PWA, Windows or Tailscale changes. Spotify remains outside this release.
+
+## V2.2 assignment breakdown and task integration
+
+Create an assignment with clearly grouped required/optional fields, then optionally choose **Break into tasks** or **Maybe later** after it is saved. Assignment Details offers the same breakdown later. Editable manual rows and offline Research report, Programming assignment, Presentation and General assignment templates become ordinary linked Tasks only when selected and explicitly saved. Batch saves are atomic and retry-safe; pending drafts retain their batch ID in the same tab/origin across refreshes. No separate Subtask system is added.
+
+Details, Tasks and Today use the same completion/edit controls and parent links. Details shows task workload/next step; Today includes upcoming assignment Tasks and undated next steps using existing priorities. Focus starts the existing timer without completing the Task. Existing estimate-weighted progress, zero-estimate fallback, manual-without-tasks, Submitted=100%, forecast and actual-study-time rules are unchanged. A first-task notice explains the switch from displayed manual progress while retaining its stored value.
+
+To-dos remain lightweight. **Convert to Task** is explicit and prefilled; creation and removal of the original happen atomically. Failure preserves the To-do and uncertain successful retries acknowledge the same Task. Semester Progress now displays **QUT Y1S2 | Week 11 of 13** in one uniformly styled, naturally wrapping strong text element; Dashboard's small date/week header and all special semester states remain.
+
+See the [V2.2 guide](docs/V2.2-GUIDE.md) for usage, retry/storage limits, exact backup verification/update/recovery commands and physical device checks. No database migration, dependency, timer architecture, authentication, backup-format, Windows, Tailscale or PWA infrastructure changes. Spotify remains outside this release.

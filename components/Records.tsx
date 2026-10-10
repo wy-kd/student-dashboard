@@ -1,6 +1,8 @@
 'use client';
 import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
+import { AssignmentBreakdown } from './AssignmentBreakdown';
+import { assignmentTaskSummary } from '@/lib/assignment-breakdown';
 import { RecurringTasks } from './RecurringTasks';
 import { TodoList } from './TodoList';
 import { Plus, ArrowLeft, ArrowUpRight } from 'lucide-react';
@@ -328,6 +330,7 @@ export function SimpleRows({ entity, rows }: { entity: Entity; rows: RecordRow[]
 }
 export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subject'; id: string }) {
   const { allData: d, now, open, go, save, notify } = useApp();
+  const [breaking, setBreaking] = useState(false);
   const r = d[entity].find((r) => r.id === id);
   if (!r)
     return (
@@ -526,14 +529,28 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
         </details>
       )}
       <Section
-        title={exam ? 'Revision tasks' : 'Tasks'}
+        title={
+          entity === 'assignment'
+            ? `Assignment tasks · ${tasks.filter((t) => t.status === 'Completed').length} of ${tasks.length} completed`
+            : exam
+              ? 'Revision tasks'
+              : 'Tasks'
+        }
         action={
-          <button className="text-button" onClick={() => open({ entity: 'task', prefill })}>
-            <Plus size={16} />
-            Add task
-          </button>
+          <div className="inline">
+            {entity === 'assignment' && (
+              <button className="button secondary" onClick={() => setBreaking(true)}>
+                Break into tasks
+              </button>
+            )}
+            <button className="text-button" onClick={() => open({ entity: 'task', prefill })}>
+              <Plus size={16} />
+              {entity === 'assignment' ? 'Add another task' : 'Add task'}
+            </button>
+          </div>
         }
       >
+        {entity === 'assignment' && tasks.length > 0 && <AssignmentTaskWorkload assignment={r} />}
         {tasks.length ? (
           tasks.map((t) => <TaskRow key={t.id} row={t} />)
         ) : (
@@ -543,6 +560,9 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
           />
         )}
       </Section>
+      {breaking && entity === 'assignment' && (
+        <AssignmentBreakdown key={r.id} assignment={r} close={() => setBreaking(false)} />
+      )}
       <Section
         title="Study sessions"
         action={
@@ -607,5 +627,25 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
         </Section>
       )}
     </>
+  );
+}
+
+function AssignmentTaskWorkload({ assignment }: { assignment: RecordRow }) {
+  const { allData } = useApp();
+  const summary = assignmentTaskSummary(assignment, allData);
+  return (
+    <div className="assignment-task-workload">
+      <p>
+        {round(summary.estimated)}h estimated tasks · {round(summary.completedEstimate)}h in
+        completed tasks · {round(summary.remainingEstimate)}h remaining task estimates
+      </p>
+      <p className="muted">
+        {summary.next
+          ? `Next outstanding step: ${summary.next.name}`
+          : 'All linked tasks completed.'}{' '}
+        Estimates are not logged study time.
+      </p>
+      <Progress value={assignmentProgress(assignment, allData)} label="Assignment progress" />
+    </div>
   );
 }

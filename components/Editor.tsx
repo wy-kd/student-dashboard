@@ -1,4 +1,6 @@
 'use client';
+import { AssignmentBreakdown, ManualProgressNotice } from './AssignmentBreakdown';
+import { todoRequestId } from '@/lib/todo-request-id';
 import { SemesterBreaks } from './SemesterBreaks';
 import { DateTimeInput } from './DateTimeInput';
 import { useEffect, useRef, useState } from 'react';
@@ -24,6 +26,9 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
     ...prefill,
     ...row,
   }));
+  const createRequest = useRef<string | null>(null);
+  const [created, setCreated] = useState<RecordRow | null>(null),
+    [breaking, setBreaking] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   useEffect(() => {
@@ -34,8 +39,11 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
     setBusy(true);
     setError('');
     try {
-      await save(entity, values, row);
-      close();
+      if (!row && (entity === 'assignment' || entity === 'task'))
+        createRequest.current ??= todoRequestId();
+      const saved = await save(entity, values, row, createRequest.current ?? undefined);
+      if (entity === 'assignment' && !row && saved) setCreated(saved);
+      else close();
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -66,6 +74,7 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
       <label key={f.key} htmlFor={id} className={f.type === 'textarea' ? 'field full' : 'field'}>
         <span>
           {f.label}
+          {entity === 'assignment' && !f.required ? ' (optional)' : ''}
           {f.required && <b aria-hidden="true"> *</b>}
         </span>
         {f.type === 'textarea' ? (
@@ -144,9 +153,30 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
     (f) =>
       f.required ||
       ['dueAt', 'weighting', 'score', 'maximum', 'plannedHours'].includes(f.key) ||
+      (entity === 'assignment' && f.key === 'estimatedHours') ||
       (entity === 'grade' && ['assignmentId', 'examId'].includes(f.key)),
   );
   const extra = fields[entity].filter((f) => !essentials.includes(f));
+  if (created && breaking) return <AssignmentBreakdown assignment={created} close={close} />;
+  if (created)
+    return (
+      <dialog ref={dialog} className="editor" aria-label="Assignment created" onCancel={close}>
+        <div className="assignment-created">
+          <h2>Assignment created</h2>
+          <p>{created.name}</p>
+          <p>Would you like to break this assignment into smaller tasks?</p>
+          <p className="muted">Your assignment is safely saved. This step is optional.</p>
+          <div className="dialog-actions">
+            <button className="button secondary" onClick={close}>
+              Maybe later
+            </button>
+            <button className="button primary" onClick={() => setBreaking(true)}>
+              Break into tasks
+            </button>
+          </div>
+        </div>
+      </dialog>
+    );
   return (
     <dialog
       ref={dialog}
@@ -191,10 +221,33 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
             Revision topics control progress when added. Use manual progress before adding topics.
           </p>
         )}
-        <div className="form-grid">{essentials.map(control)}</div>
+        {entity === 'assignment' ? (
+          <>
+            <fieldset className="assignment-form-group">
+              <legend>Assignment & deadline</legend>
+              <p className="muted">Fields marked * are required.</p>
+              <div className="form-grid">{essentials.filter((f) => f.required).map(control)}</div>
+            </fieldset>
+            <fieldset className="assignment-form-group">
+              <legend>Workload & weighting (optional)</legend>
+              <div className="form-grid">{essentials.filter((f) => !f.required).map(control)}</div>
+            </fieldset>
+          </>
+        ) : (
+          <div className="form-grid">{essentials.map(control)}</div>
+        )}
+        {entity === 'task' && (
+          <ManualProgressNotice
+            assignment={allData.assignment.find((a) => a.id === values.assignmentId)}
+          />
+        )}
         {extra.length > 0 && (
           <details className="more-fields" open={!!row}>
-            <summary>More details</summary>
+            <summary>
+              {entity === 'assignment'
+                ? 'Status, priority & additional details (optional)'
+                : 'More details'}
+            </summary>
             <div className="form-grid">{extra.map(control)}</div>
           </details>
         )}

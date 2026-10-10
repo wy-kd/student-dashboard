@@ -2,10 +2,10 @@
 import { formatDate, formatTime } from '@/lib/format';
 import { useApp } from './context';
 import { Section, Empty, TaskRow } from './ui';
-import { calendarEvents, priorities } from '@/lib/calculations';
+import { calendarEvents, priorities, addDays } from '@/lib/calculations';
 import { weeklyReview } from '@/lib/weekly-review';
 export function Today() {
-  const { data: d, now, open } = useApp(),
+  const { data: d, now, open, go } = useApp(),
     today = now.slice(0, 10),
     schedule = calendarEvents(d, today, today).filter(
       (e) => e.entity === 'class' || e.entity === 'studySession',
@@ -63,6 +63,36 @@ export function Today() {
           )}
         </Section>
       </div>
+      <Section title="Upcoming assignment tasks">
+        {d.task
+          .filter(
+            (t) =>
+              t.assignmentId &&
+              t.status !== 'Completed' &&
+              t.dueAt?.slice(0, 10) > today &&
+              t.dueAt.slice(0, 10) <= addDays(today, 7),
+          )
+          .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+          .slice(0, 10)
+          .map((t) => (
+            <TaskRow key={t.id} row={t} />
+          ))}
+        <button className="text-button" onClick={() => go('/tasks')}>
+          View all tasks →
+        </button>
+      </Section>
+      <Section title="Next assignment steps">
+        {priorities(d, now)
+          .filter((r) => r.entity === 'assignment')
+          .map((r) =>
+            d.task.find((t) => t.assignmentId === r.id && t.status !== 'Completed' && !t.dueAt),
+          )
+          .filter((t): t is NonNullable<typeof t> => !!t)
+          .slice(0, 5)
+          .map((t) => (
+            <TaskRow key={t.id} row={t} />
+          ))}
+      </Section>
       <Section title="Recommended work">
         {priorities(d, now)
           .slice(0, 3)

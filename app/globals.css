@@ -3470,3 +3470,112 @@ td:first-child {
     visibility: hidden;
   }
 }
+
+/* V2.2: assignment workflows reuse the existing editor and Task rows. */
+.assignment-created {
+  padding: 24px;
+}
+.assignment-form-group,
+.breakdown-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.assignment-form-group {
+  margin: 20px 0;
+}
+.assignment-form-group legend {
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.breakdown-editor {
+  max-width: 760px;
+}
+.breakdown-methods,
+.breakdown-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.breakdown-methods {
+  margin: 20px 0;
+}
+.breakdown-methods .field {
+  flex: 1;
+  min-width: 180px;
+}
+.breakdown-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+  padding: 16px;
+  margin: 16px 0;
+}
+.breakdown-row-head {
+  margin-bottom: 14px;
+}
+.breakdown-row .button {
+  min-height: 44px;
+}
+.breakdown-row input,
+.breakdown-row textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+.workflow-notice {
+  background: var(--accent-bg);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.875rem;
+}
+.assignment-task-workload {
+  margin-bottom: 20px;
+}
+.task-parent {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.task-focus {
+  flex-shrink: 0;
+}
+.task-focus,
+.todo-convert {
+  min-height: 44px;
+}
+.breakdown-editor .dialog-head,
+.assignment-created,
+.assignment-task-workload,
+.task-row .grow {
+  overflow-wrap: anywhere;
+}
+.semester-week .semester-summary {
+  display: block;
+  font: inherit;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .task-row {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  .breakdown-row .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .breakdown-methods {
+    align-items: stretch;
+  }
+  .breakdown-methods > * {
+    width: 100%;
+  }
+  .breakdown-row-head {
+    align-items: flex-start;
+  }
+}

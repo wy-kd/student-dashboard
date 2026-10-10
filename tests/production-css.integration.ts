@@ -32,6 +32,10 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.study-duration-fields\{[^}]*grid-template-columns:repeat\(2/);
   assert.match(css, /\.dashboard-context\{[^}]*margin:0 0 8px/);
   assert.doesNotMatch(css, /timer-drag|timer-safe-area|data-movable|data-dragging/);
+  assert.match(css, /\.breakdown-row\{[^}]*padding:16px/);
+  assert.match(css, /\.breakdown-methods[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.assignment-form-group legend\{[^}]*font-weight:700/);
+  assert.match(css, /\.semester-summary\{[^}]*line-height:1\.5/);
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

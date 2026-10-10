@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { db } from './db';
 import { entities, fields, type Entity, type Data, defaults } from './model';
 import { schemaFor, settingSchema } from './validation';
@@ -73,10 +74,24 @@ export async function validateRelations(client: any, entity: Entity, row: any, i
       throw new AppError('Remove recurring classes before moving a subject to another semester.');
   }
 }
-export async function saveRow(entity: Entity, input: any, id?: string, revision?: number) {
+export async function saveRow(
+  entity: Entity,
+  input: any,
+  id?: string,
+  revision?: number,
+  requestId?: string,
+) {
   const row: any = schemaFor(entity).parse(input);
   return db.$transaction(async (tx) => {
     const client = tx as any;
+    let createId: string | undefined;
+    if (!id && requestId) {
+      if (entity !== 'assignment' && entity !== 'task')
+        throw new AppError('Unsupported create request.');
+      createId = `${entity}-${z.string().uuid().parse(requestId)}`;
+      const previous = await client[entity].findUnique({ where: { id: createId } });
+      if (previous) return previous;
+    }
     if (id) {
       const old = await client[entity].findUnique({ where: { id } });
       if (!old) throw new AppError('This record was deleted on another device.', 404);
@@ -104,7 +119,7 @@ export async function saveRow(entity: Entity, input: any, id?: string, revision?
           where: { id },
           data: { ...row, demo: false, revision: { increment: 1 } },
         })
-      : client[entity].create({ data: row });
+      : client[entity].create({ data: { ...row, ...(createId ? { id: createId } : {}) } });
   });
 }
 export async function deleteRow(entity: Entity, id: string, revision: number) {

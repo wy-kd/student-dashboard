@@ -106,8 +106,9 @@ test('semester identity and teaching state share a bold summary in every state',
     ['2026-10-01', 'Teaching complete'],
   ]) {
     const html = render(React.createElement(SemesterWeek, { semester, now, data: data() }));
-    assert.ok(html.includes('<strong class="semester-summary">QUT Y1S2</strong>'));
-    assert.ok(html.includes('<p class="semester-state">' + expected + '</p>'));
+    assert.ok(
+      html.includes('<strong class="semester-summary">QUT Y1S2 | ' + expected + '</strong>'),
+    );
     if (expected === 'Semester Break') assert.match(html, /Teaching Week 2 resumes 21\/09\/2026/);
   }
 });
