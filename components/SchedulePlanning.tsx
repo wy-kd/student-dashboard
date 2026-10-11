@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef } from 'react';
+import { todoRequestId } from '@/lib/todo-request-id';
 import { useApp } from './context';
 import { Section } from './ui';
 import { DateTimeInput } from './DateTimeInput';
@@ -65,7 +66,9 @@ export function SchedulePlanning() {
     }
   })();
   const configured = !!(
-    d.planning?.windows.length || d.planning?.exceptions.some((x) => x.windows.length)
+    d.planning?.windows.length ||
+    d.planning?.exceptions.length ||
+    (d.planning?.preference?.revision ?? 0) > 0
   );
   const totals = proposalTotals(rows, (start, end) => {
     const x = civilRange(start, end, zone);
@@ -125,7 +128,7 @@ export function SchedulePlanning() {
     setError('');
     try {
       pending.current ??= {
-        requestId: crypto.randomUUID(),
+        requestId: todoRequestId(),
         fingerprint: preview.fingerprint,
         changes: rows
           .filter((r) => r.selected)
@@ -667,7 +670,7 @@ export function SchedulePlanning() {
                       ...rows,
                       draftFor(
                         {
-                          id: crypto.randomUUID(),
+                          id: todoRequestId(),
                           workKey: null,
                           name: 'Reserved study time',
                           startAt: Date.now(),

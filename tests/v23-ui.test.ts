@@ -368,7 +368,8 @@ test('Availability editor copies days, edits multiple periods/exceptions, preser
   await select(reopened.querySelector('select')!, 'unavailable');
   await submit(reopened.querySelector('form')!);
   assert.deepEqual(lastPayload.windows, []);
-  await select(reopened.querySelector('select')!, 'weekly');
+  await click(button('Remove date change', reopened));
+  assert.equal((reopened.querySelector('select') as HTMLSelectElement).value, 'weekly');
   await submit(reopened.querySelector('form')!);
   assert.equal(lastPayload.windows, null);
   assert.deepEqual(data.planning!.exceptions, []);
@@ -390,8 +391,10 @@ test('Planning entry points choose correct civil periods and missing availabilit
     assert.equal(lastPayload.endDate, endDate);
     await click(button('Cancel proposal'));
   }
-  const windows = data.planning!.windows;
+  const windows = data.planning!.windows,
+    revision = data.planning!.preference.revision;
   data.planning!.windows = [];
+  data.planning!.preference.revision = 0;
   await render(null);
   await render(React.createElement(SchedulePlanning));
   await click(button('Plan my week'));
@@ -400,6 +403,7 @@ test('Planning entry points choose correct civil periods and missing availabilit
   await click(button('Set availability'));
   assert.equal(lastNavigation, '/settings#availability');
   data.planning!.windows = windows;
+  data.planning!.preference.revision = revision;
   await render(null);
 });
 test('Scheduling preview edits and selective approval retain uncertain requests, while Cancel makes no changes', async () => {

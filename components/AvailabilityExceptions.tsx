@@ -37,7 +37,7 @@ export function AvailabilityExceptions({
     [saved, setSaved] = useState('');
   const pending = useRef(false);
   function edit(date: string) {
-    if (dirty && !confirm('Discard the unsaved date-specific change?')) return;
+    if (dirty && !confirm('Discard the unsaved date-specific change?')) return false;
     const exception = d.planning?.exceptions.find((x) => x.date === date);
     setDate(date);
     setMode(exception ? (exception.windows.length ? 'available' : 'unavailable') : 'available');
@@ -49,6 +49,7 @@ export function AvailabilityExceptions({
     setDirty(!exception);
     setError('');
     setSaved('');
+    return true;
   }
   function changed() {
     setDirty(true);
@@ -223,6 +224,19 @@ export function AvailabilityExceptions({
               onClick={() => edit(exception.date)}
             >
               Edit date change
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                if (edit(exception.date)) {
+                  setMode('weekly');
+                  changed();
+                }
+              }}
+            >
+              Remove date change
             </button>
           </div>
         ))}

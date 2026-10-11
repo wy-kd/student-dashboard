@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { todoRequestId } from '@/lib/todo-request-id';
 import { useApp } from './context';
 import { useProductivity } from './productivity';
 import { DateTimeInput } from './DateTimeInput';
@@ -20,7 +21,7 @@ export function PlannedWorkRow({ block, compact = false }: { block: any; compact
   async function start() {
     if (busy) return;
     setBusy(true);
-    requestId.current ??= crypto.randomUUID();
+    requestId.current ??= todoRequestId();
     try {
       await act('timer.start', {
         timer: {
@@ -211,7 +212,7 @@ export function PlannedWorkEditor({ id, close }: { id: string; close: () => void
     setError('');
     try {
       pending.current ??= {
-        requestId: crypto.randomUUID(),
+        requestId: todoRequestId(),
         fingerprint: context.fingerprint,
         changes: [
           {
@@ -416,7 +417,7 @@ export function PlannedWorkReview({ block, close }: { block: any; close: () => v
             pending.current ??= {
               id: block.id,
               revision: block.revision,
-              requestId: crypto.randomUUID(),
+              requestId: todoRequestId(),
               actualStart,
               minutes: h * 60 + m,
               note,

@@ -149,7 +149,7 @@ function WeeklyAvailability({
                   ? hours
                       .map((w) => `${formatTime(w.startTime)}–${formatTime(w.endTime)}`)
                       .join(', ')
-                  : d.planning?.windows.length
+                  : (d.planning?.preference?.revision ?? 0) > 0
                     ? 'Unavailable'
                     : 'No hours set'}
               </span>

@@ -59,6 +59,15 @@ test('production CSS contains current navigation, timer and recurring editor lay
     css,
     /\.planning-suggestion \.form-grid\{[^}]*grid-template-columns:minmax\(0,1fr\)/,
   );
+  assert.match(css, /\.record-editor>form\{[^}]*min-height:0/);
+  assert.match(css, /\.record-editor \.record-editor-body\{[^}]*overflow-y:auto/);
+  assert.match(css, /\.record-editor \.dialog-actions\{[^}]*flex-shrink:0/);
+  assert.match(css, /\.quick-add-dialog\{[^}]*max-height:calc\(100dvh/);
+  assert.match(css, /\.quick-add-actions\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.planning-summary\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /container:planning\/inline-size/);
+  assert.match(css, /\.sidebar nav\{[^}]*overflow-anchor:none/);
+  assert.match(css, /\.inbox-summary\{[^}]*flex-wrap:wrap/);
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

@@ -4369,3 +4369,161 @@ td:first-child {
 .inbox-item button {
   min-height: 44px;
 }
+/* Shared V2.3.1 surfaces: readable density, native focus and bounded body scroll. */
+.record-editor {
+  padding: 0;
+  overflow: hidden;
+  max-height: calc(100dvh - 32px);
+}
+.record-editor[open] {
+  display: flex;
+  flex-direction: column;
+}
+.record-editor > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: inherit;
+  width: 100%;
+}
+.record-editor .dialog-head {
+  padding: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.record-editor-body {
+  min-width: 0;
+}
+.record-editor .record-editor-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  overscroll-behavior: contain;
+}
+.record-editor .dialog-actions {
+  padding: 16px 20px;
+  margin: 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  background: var(--surface);
+}
+.record-editor button,
+.quick-add-dialog button {
+  min-height: 44px;
+}
+.availability-sections,
+.planning-workspace,
+.inbox-review {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.availability-sections h3,
+.planning-workspace h3,
+.inbox-review h3 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.availability-sections h4,
+.planning-workspace h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.availability-sections p,
+.inbox-review p {
+  max-width: 68ch;
+  overflow-wrap: anywhere;
+}
+.availability-sections .field > .muted {
+  font-weight: 400;
+  font-size: 0.8125rem;
+}
+.availability-sections .row {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.availability-sections .row .grow {
+  min-width: min(100%, 180px);
+  overflow-wrap: anywhere;
+}
+.availability-sections .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+.availability-exceptions > form,
+.availability-day,
+.availability-sections details > form {
+  display: grid;
+  gap: 12px;
+}
+.availability-sections summary,
+.planning-workspace summary,
+.inbox-review summary {
+  min-height: 44px;
+  align-content: center;
+}
+.planning-preview-list {
+  gap: 8px;
+}
+.planning-suggestion {
+  margin: 0;
+  border-radius: 8px;
+}
+.planning-work-item {
+  padding: 12px 0;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.planning-suggestion .form-grid,
+.inbox-review .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+.planning-workspace .form-actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.planned-work-actions {
+  align-items: start;
+}
+.planned-work-actions > .planned-work-more {
+  min-width: 120px;
+}
+.planned-work-editor .full {
+  grid-column: 1 / -1;
+}
+@container planning (max-width: 540px) {
+  .planning-suggestion .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .record-editor .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .record-editor .dialog-head,
+  .record-editor .record-editor-body {
+    padding: 16px;
+  }
+  .record-editor .dialog-actions {
+    padding: 12px 16px;
+  }
+  .record-editor .dialog-actions > button {
+    flex: 1;
+  }
+  .quick-add-dialog {
+    border-radius: 12px;
+  }
+  .planning-suggestion-heading {
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-add-dialog,
+  .record-editor {
+    scroll-behavior: auto;
+  }
+}

@@ -201,7 +201,9 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
   return (
     <dialog
       ref={dialog}
-      className="editor"
+      className={
+        'editor' + (['assignment', 'exam', 'task'].includes(entity) ? ' record-editor' : '')
+      }
       aria-label={(row ? 'Edit ' : 'New ') + labels[entity]}
       onCancel={(e) => {
         e.preventDefault();
@@ -226,64 +228,68 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
             <X size={21} />
           </button>
         </div>
-        {(entity === 'task' || entity === 'studySession' || entity === 'grade') && (
-          <p className="muted">
-            {entity === 'task'
-              ? 'Subject and assessment links are optional. A linked assessment supplies its subject.'
-              : 'Link an assignment or an exam. The subject follows your selection.'}
-          </p>
-        )}
-        {entity === 'assignment' && (
-          <p className="muted">
-            Task completion controls progress when tasks are linked. Manual progress applies when
-            there are no tasks.
-          </p>
-        )}
-        {entity === 'exam' && (
-          <p className="muted">
-            Revision topics control progress when added. Use manual progress before adding topics.
-          </p>
-        )}
-        <fieldset className="availability-fieldset" disabled={busy || uncertain}>
-          {quick ? (
-            <>
-              <p className="muted">Fields marked * are required.</p>
-              <div className="form-grid">{essentials.map(control)}</div>
-            </>
-          ) : entity === 'assignment' ? (
-            <>
-              <fieldset className="assignment-form-group">
-                <legend>Assignment & deadline</legend>
+        <div className="record-editor-body">
+          {(entity === 'task' || entity === 'studySession' || entity === 'grade') && (
+            <p className="muted">
+              {entity === 'task'
+                ? 'Subject and assessment links are optional. A linked assessment supplies its subject.'
+                : 'Link an assignment or an exam. The subject follows your selection.'}
+            </p>
+          )}
+          {entity === 'assignment' && (
+            <p className="muted">
+              Task completion controls progress when tasks are linked. Manual progress applies when
+              there are no tasks.
+            </p>
+          )}
+          {entity === 'exam' && (
+            <p className="muted">
+              Revision topics control progress when added. Use manual progress before adding topics.
+            </p>
+          )}
+          <fieldset className="availability-fieldset" disabled={busy || uncertain}>
+            {quick ? (
+              <>
                 <p className="muted">Fields marked * are required.</p>
-                <div className="form-grid">{essentials.filter((f) => f.required).map(control)}</div>
-              </fieldset>
-              <fieldset className="assignment-form-group">
-                <legend>Workload & weighting (optional)</legend>
-                <div className="form-grid">
-                  {essentials.filter((f) => !f.required).map(control)}
-                </div>
-              </fieldset>
-            </>
-          ) : (
-            <div className="form-grid">{essentials.map(control)}</div>
+                <div className="form-grid">{essentials.map(control)}</div>
+              </>
+            ) : entity === 'assignment' ? (
+              <>
+                <fieldset className="assignment-form-group">
+                  <legend>Assignment & deadline</legend>
+                  <p className="muted">Fields marked * are required.</p>
+                  <div className="form-grid">
+                    {essentials.filter((f) => f.required).map(control)}
+                  </div>
+                </fieldset>
+                <fieldset className="assignment-form-group">
+                  <legend>Workload & weighting (optional)</legend>
+                  <div className="form-grid">
+                    {essentials.filter((f) => !f.required).map(control)}
+                  </div>
+                </fieldset>
+              </>
+            ) : (
+              <div className="form-grid">{essentials.map(control)}</div>
+            )}
+            {entity === 'task' && (
+              <ManualProgressNotice
+                assignment={allData.assignment.find((a) => a.id === values.assignmentId)}
+              />
+            )}
+            {extra.length > 0 && (
+              <details className="more-fields" open={!!row}>
+                <summary>More options</summary>
+                <div className="form-grid">{extra.map(control)}</div>
+              </details>
+            )}
+          </fieldset>
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
           )}
-          {entity === 'task' && (
-            <ManualProgressNotice
-              assignment={allData.assignment.find((a) => a.id === values.assignmentId)}
-            />
-          )}
-          {extra.length > 0 && (
-            <details className="more-fields" open={!!row}>
-              <summary>More options</summary>
-              <div className="form-grid">{extra.map(control)}</div>
-            </details>
-          )}
-        </fieldset>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
+        </div>
         <div className="dialog-actions">
           <button
             type="button"
