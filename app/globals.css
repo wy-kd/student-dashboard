@@ -4168,7 +4168,7 @@ td:first-child {
   gap: 12px;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .availability-week-row > span {
   overflow-wrap: anywhere;
@@ -4185,7 +4185,7 @@ td:first-child {
   max-width: 42rem;
 }
 .availability-refresh {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
   padding-top: 16px;
 }
 @container availability (max-width: 540px) {
@@ -4221,11 +4221,11 @@ td:first-child {
 }
 .planning-summary strong {
   font-size: 1.15rem;
-  color: var(--text);
+  color: var(--ink);
 }
 .planning-readiness {
   padding: 16px 0;
-  border-block: 1px solid var(--border);
+  border-block: 1px solid var(--line);
 }
 .planning-date-group {
   min-width: 0;
@@ -4248,7 +4248,7 @@ td:first-child {
 }
 .planning-attention-group {
   padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .planning-attention-group ul {
   padding-left: 20px;
@@ -4259,7 +4259,7 @@ td:first-child {
   overflow-wrap: anywhere;
 }
 .planning-issue {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   padding: 10px 0;
 }
 .planning-issue > summary,
@@ -4281,5 +4281,61 @@ td:first-child {
   }
   .planning-workspace .form-actions {
     flex-wrap: wrap;
+  }
+}
+.quick-add-dialog {
+  position: fixed;
+  inset: 80px 24px auto auto;
+  margin: 0;
+  width: min(390px, calc(100vw - 32px));
+  max-height: calc(100dvh - 112px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: auto;
+  box-shadow: var(--shadow);
+}
+.quick-add-dialog::backdrop {
+  background: rgb(0 0 0 / 0.25);
+}
+.quick-add-dialog .dialog-head {
+  padding: 16px;
+  margin: 0;
+}
+.quick-add-body {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 16px;
+}
+.quick-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quick-add-actions button {
+  min-height: 44px;
+  flex: 1 1 140px;
+}
+.quick-add-dialog .quick-capture {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.quick-capture [role='alert'],
+.quick-capture [role='status'] {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.quick-todo {
+  display: grid;
+  gap: 12px;
+}
+@media (max-width: 800px) {
+  .quick-add-dialog {
+    inset: 16px auto auto 16px;
+    width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px - env(safe-area-inset-bottom));
   }
 }

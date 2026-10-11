@@ -400,10 +400,18 @@ export async function productivityAction(userId: string, b: any, now = Date.now(
       for (const r of rules) await tx.reminderRule.create({ data: { ...r, userId } });
       return;
     }
-    if (b.action === 'capture')
-      return tx.inboxItem.create({
-        data: { userId, name: z.string().trim().min(1).max(500).parse(b.name), createdAt: now },
-      });
+    if (b.action === 'capture') {
+      const name = z.string().trim().min(1).max(500).parse(b.name);
+      const id = b.requestId ? 'capture-' + z.string().uuid().parse(b.requestId) : undefined;
+      if (id) {
+        const previous = await tx.inboxItem.findUnique({ where: { id } });
+        if (previous) {
+          if (previous.userId !== userId) throw new AppError('Capture unavailable.', 409);
+          return previous;
+        }
+      }
+      return tx.inboxItem.create({ data: { ...(id ? { id } : {}), userId, name, createdAt: now } });
+    }
     if (b.action === 'inbox.delete' || b.action === 'inbox.organise') {
       const item = await tx.inboxItem.findFirst({ where: { id: idSchema.parse(b.id), userId } });
       if (!item) throw new AppError('Capture already organised or deleted.', 409);

@@ -22,7 +22,8 @@ import { useSidebarPreference } from './useSidebarPreference';
 import { FocusMode } from './StudyTimer';
 import { FloatingTimer } from './FloatingTimer';
 import { floatingTimerVisible } from '@/lib/floating-timer';
-import { Inbox, QuickCapture } from './Inbox';
+import { Inbox } from './Inbox';
+import { QuickAdd } from './QuickAdd';
 import { NotificationCentre } from './Notifications';
 import { WeeklyReview } from './DailyPlanning';
 import { Dashboard } from './Dashboard';
@@ -552,36 +553,7 @@ export function Workspace() {
                 <Plus size={18} />
                 <span>Quick add</span>
               </button>
-              {quick && (
-                <>
-                  <button
-                    className="menu-dismiss"
-                    aria-label="Close quick add menu"
-                    onClick={() => setQuick(false)}
-                  />
-                  <div className="quick-menu">
-                    <QuickCapture />
-                    <strong className="quick-menu-label">Quick Add</strong>
-                    {(
-                      [
-                        'task',
-                        'assignment',
-                        'exam',
-                        'class',
-                        'studySession',
-                        'importantDate',
-                        'subject',
-                        'semester',
-                      ] as Entity[]
-                    ).map((e) => (
-                      <button key={e} onClick={() => open({ entity: e })}>
-                        <Plus size={16} />
-                        {labels[e]}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              {quick && <QuickAdd close={() => setQuick(false)} context={{ route, id }} />}
             </div>
           </header>
           <main id="main" key={pathname} tabIndex={-1}>

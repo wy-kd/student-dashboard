@@ -292,6 +292,25 @@ test('Overnight appointments and planned/actual links do not produce duplicate o
   await saveAvailability('owner', availabilityDraft(d.planning));
   assert.equal(await db.studySession.count(), actualCount);
 });
+test('Capture request retries persist exactly one item without changing deadlines', async () => {
+  const { productivityAction } = await import('../lib/productivity');
+  const { randomUUID } = await import('node:crypto');
+  const input = {
+    action: 'capture',
+    requestId: randomUUID(),
+    name: 'Lecturer announced a changed deadline',
+  };
+  const before = await db.inboxItem.count();
+  const tasks = await db.task.findMany();
+  const first: any = await productivityAction('owner', input);
+  const again: any = await productivityAction('owner', input);
+  assert.equal(first.id, again.id);
+  assert.equal(await db.inboxItem.count(), before + 1);
+  assert.deepEqual(await db.task.findMany(), tasks);
+  await assert.rejects(
+    productivityAction('owner', { action: 'capture', requestId: randomUUID(), name: '   ' }),
+  );
+});
 test('Planning API retains authentication and same-origin write protection', async () => {
   assert.equal((await api.GET(new NextRequest('http://localhost:3000/api/planning'))).status, 401);
   assert.equal(

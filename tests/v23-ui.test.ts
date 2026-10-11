@@ -6,6 +6,8 @@ import { AppContext } from '../components/context';
 import { SchedulePlanning } from '../components/SchedulePlanning';
 import { generateSchedule } from '../lib/planning-engine';
 import { instant } from '../lib/planning-time';
+import { QuickAdd } from '../components/QuickAdd';
+import { QuickCapture } from '../components/QuickCapture';
 import { Editor } from '../components/Editor';
 import { defaults } from '../lib/model';
 import { Availability } from '../components/Availability';
@@ -37,6 +39,9 @@ for (const name of [
 }
 dom.window.HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
+};
+dom.window.HTMLDialogElement.prototype.close = function () {
+  this.open = false;
 };
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root')!);
@@ -71,7 +76,12 @@ let node: React.ReactNode,
   lastPayload: any;
 let saveFailure: 'validation' | 'network' | null = null;
 const recordRequests: any[] = [];
-let closedEditor = false;
+let closedEditor = false,
+  openedRecord: any,
+  captureFailure = false;
+const captures = new Map<string, any>(),
+  todos = new Map<string, any>(),
+  quickRequests: any[] = [];
 const oldFetch = globalThis.fetch;
 function tree() {
   return React.createElement(
@@ -84,7 +94,9 @@ function tree() {
         reload: async () => {
           await render();
         },
-        open() {},
+        open(value) {
+          openedRecord = value;
+        },
         save: async (entity, values, old, requestId) => {
           recordRequests.push({ entity, values: structuredClone(values), old, requestId });
           if (saveFailure === 'validation')
@@ -145,6 +157,16 @@ async function submit(form: HTMLFormElement) {
 globalThis.fetch = async (_url: any, init: any) => {
   if (_url === '/api/productivity') {
     const payload = JSON.parse(init.body);
+    if (['capture', 'todo.create'].includes(payload.action)) {
+      quickRequests.push(structuredClone(payload));
+      const store = payload.action === 'capture' ? captures : todos;
+      if (!store.has(payload.requestId)) store.set(payload.requestId, payload);
+      if (captureFailure) {
+        captureFailure = false;
+        throw Error('Interrupted response');
+      }
+      return new Response(JSON.stringify({ ok: true }));
+    }
     assert.equal(payload.action, 'timer.start');
     timerStarts++;
     timerPayload = payload.timer;
@@ -599,6 +621,40 @@ test('Full edit loads advanced saved fields and dirty-close rejection retains th
   } finally {
     globalThis.confirm = previous;
   }
+});
+test('Quick Capture retains failures and retries one capture; Quick Add creates a distinct To-do and keeps page context', async () => {
+  await render(null);
+  await render(React.createElement(QuickCapture));
+  const form = document.querySelector('form')!;
+  assert.equal(button('Capture').disabled, true);
+  await input(form.querySelector('input')!, 'Deadline announcement');
+  captureFailure = true;
+  await submit(form);
+  assert.equal(captures.size, 1);
+  assert.ok(button('Retry same capture'));
+  assert.equal((form.querySelector('input') as HTMLInputElement).value, 'Deadline announcement');
+  const request = quickRequests.at(-1);
+  await submit(form);
+  assert.deepEqual(quickRequests.at(-1), request);
+  assert.equal(captures.size, 1);
+  assert.equal((form.querySelector('input') as HTMLInputElement).value, '');
+  assert.match(form.textContent!, /Captured in Inbox/);
+  await render(null);
+  await render(
+    React.createElement(QuickAdd, { close() {}, context: { route: 'exams', id: 'context-exam' } }),
+  );
+  assert.ok(document.querySelector('dialog[open]'));
+  await click(button('New To-do'));
+  const todo = document.querySelector('.quick-todo')!;
+  await input(todo.querySelector('input')!, 'Buy notebook');
+  await submit(todo as HTMLFormElement);
+  assert.equal(todos.size, 1);
+  assert.match(todo.textContent!, /No Academic Task was created/);
+  data.exam.push({ id: 'context-exam', subjectId: 'creation-subject', name: 'Context exam' });
+  await click(button('New Academic Task'));
+  assert.equal(openedRecord.entity, 'task');
+  assert.equal(openedRecord.prefill.examId, 'context-exam');
+  assert.equal(openedRecord.prefill.subjectId, 'creation-subject');
 });
 test.after(async () => {
   await act(async () => root.unmount());

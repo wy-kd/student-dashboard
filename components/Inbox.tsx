@@ -1,46 +1,10 @@
 'use client';
+export { QuickCapture } from './QuickCapture';
+import { QuickCapture } from './QuickCapture';
 import { DateTimeInput } from './DateTimeInput';
 import { useState } from 'react';
 import { useProductivity } from './productivity';
 import { Section, Empty } from './ui';
-export function QuickCapture() {
-  const { act, notify } = useProductivity(),
-    [name, setName] = useState(''),
-    [busy, setBusy] = useState(false);
-  return (
-    <form
-      className="quick-capture"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        try {
-          await act('capture', { name });
-          setName('');
-          notify('Captured in Inbox.');
-        } catch (e: any) {
-          notify(e.message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label className="field">
-        Quick Capture
-        <input
-          autoComplete="off"
-          placeholder="What do you need to remember?"
-          maxLength={500}
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
-      <button className="button primary" disabled={busy || !name.trim()}>
-        Capture
-      </button>
-    </form>
-  );
-}
 export function Inbox() {
   const { state, act, notify, allData: d } = useProductivity(),
     [selected, setSelected] = useState<string | null>(null),

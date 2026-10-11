@@ -12,7 +12,10 @@ export function useProductivity() {
         body: JSON.stringify({ action, ...values }),
       });
       const body = await response.json();
-      if (!response.ok) throw Error(body.error || 'Could not save. Please try again.');
+      if (!response.ok)
+        throw Object.assign(Error(body.error || 'Could not save. Please try again.'), {
+          status: response.status,
+        });
       await app.reload();
       return body;
     },
