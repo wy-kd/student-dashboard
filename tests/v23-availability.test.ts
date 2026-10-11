@@ -201,6 +201,34 @@ test('Planning API retains authentication and same-origin write protection', asy
     403,
   );
 });
+
+test('Remaining estimates are explicit, revision-guarded and removed only when their source is deleted', async () => {
+  const { saveWorkEstimate } = await import('../lib/planning-actions');
+  const { deleteRow } = await import('../lib/service');
+  const task = await saveRow('task', {
+    ...defaults('task'),
+    name: 'Review remaining effort',
+    estimatedHours: 3,
+    actualHours: 1,
+  });
+  const estimate = await saveWorkEstimate('owner', {
+    workKey: 'task:' + task.id,
+    minutes: 90,
+    revision: 0,
+  });
+  assert.equal(estimate.minutes, 90);
+  await assert.rejects(
+    saveWorkEstimate('owner', { workKey: 'task:' + task.id, minutes: 60, revision: 0 }),
+    /changed/,
+  );
+  await assert.rejects(
+    saveWorkEstimate('owner', { workKey: 'task:missing', minutes: 60, revision: 0 }),
+    /no longer exists/,
+  );
+  await deleteRow('task', task.id, task.revision);
+  assert.equal(await db.workEstimate.count({ where: { workKey: 'task:' + task.id } }), 0);
+});
+
 test.after(async () => {
   await db.$disconnect();
   rmSync(dir, { recursive: true, force: true });

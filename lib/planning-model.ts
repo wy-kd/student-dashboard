@@ -86,6 +86,7 @@ export const availabilitySchema = z
     }
   });
 export type PlanningState = {
+  taskRecordedMinutes?: Record<string, number>;
   preference: any;
   windows: any[];
   exceptions: any[];

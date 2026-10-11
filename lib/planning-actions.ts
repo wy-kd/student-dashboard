@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from './db';
-import { AppError } from './service';
+import { AppError, snapshot } from './service';
+import { generateSchedule } from './planning-engine';
 import { availabilitySchema } from './planning-model';
 import { civilRange } from './planning-time';
 const revisionSchema = z.number().int().nonnegative();
@@ -79,8 +80,52 @@ export async function deleteCommitment(userId: string, input: unknown) {
   });
 }
 export async function planningAction(userId: string, b: any) {
+  if (b.action === 'estimate.save') return saveWorkEstimate(userId, b.data);
+  if (b.action === 'schedule.generate') {
+    const value = z
+      .object({
+        startDate: z.string(),
+        endDate: z.string(),
+        excluded: z.array(z.string()).max(20000).optional(),
+      })
+      .strict()
+      .parse(b.data);
+    return generateSchedule(
+      await snapshot(),
+      Date.now(),
+      value.startDate,
+      value.endDate,
+      value.excluded,
+    );
+  }
   if (b.action === 'availability.save') return saveAvailability(userId, b.data);
   if (b.action === 'commitment.save') return saveCommitment(userId, b.data);
   if (b.action === 'commitment.delete') return deleteCommitment(userId, b.data);
   throw new AppError('Unsupported planning action.');
+}
+
+export async function saveWorkEstimate(userId: string, input: unknown) {
+  const value = z
+    .object({
+      workKey: z.string().regex(/^(task|assignment|exam):[^:]+$/),
+      minutes: z.number().finite().min(0).max(600000),
+      revision: revisionSchema,
+    })
+    .strict()
+    .parse(input);
+  return db.$transaction(async (tx) => {
+    const [entity, id] = value.workKey.split(':');
+    if (!(await (tx as any)[entity].findUnique({ where: { id } })))
+      throw new AppError('This work no longer exists.', 404);
+    const old = await tx.workEstimate.findUnique({
+      where: { userId_workKey: { userId, workKey: value.workKey } },
+    });
+    if ((old?.revision ?? 0) !== value.revision)
+      throw new AppError('Remaining estimate changed. Reload before editing.', 409);
+    return tx.workEstimate.upsert({
+      where: { userId_workKey: { userId, workKey: value.workKey } },
+      create: { userId, workKey: value.workKey, minutes: value.minutes, revision: 1 },
+      update: { minutes: value.minutes, revision: { increment: 1 } },
+    });
+  });
 }
