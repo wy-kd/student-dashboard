@@ -239,3 +239,14 @@ test('Maximum workloads, selected exclusions, minimum-session fragments and over
     ),
   );
 });
+
+test('Explicitly saved unavailable days mean no capacity rather than missing setup', () => {
+  const d = fixture();
+  d.planning!.windows = [];
+  d.planning!.preference.revision = 1;
+  d.task = [task('Known work', 1)];
+  const result = generateSchedule(d, now);
+  assert.equal(result.capacityMinutes, 0);
+  assert.equal(result.status, 'Needs adjustment');
+  assert.equal(result.unscheduled[0].minutes, 60);
+});

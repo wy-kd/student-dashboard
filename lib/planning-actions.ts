@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { db } from './db';
 import { AppError, snapshot } from './service';
 import { generateSchedule } from './planning-engine';
+import { planningFingerprint, approveSchedule, undoSchedule } from './planning-approval';
 import { availabilitySchema } from './planning-model';
 import { civilRange } from './planning-time';
 const revisionSchema = z.number().int().nonnegative();
@@ -80,6 +81,10 @@ export async function deleteCommitment(userId: string, input: unknown) {
   });
 }
 export async function planningAction(userId: string, b: any) {
+  if (b.action === 'block.lock') return setBlockLock(userId, b.data);
+  if (b.action === 'block.dismiss') return dismissBlock(userId, b.data);
+  if (b.action === 'schedule.approve') return approveSchedule(userId, b.data);
+  if (b.action === 'schedule.undo') return undoSchedule(userId, b.data);
   if (b.action === 'estimate.save') return saveWorkEstimate(userId, b.data);
   if (b.action === 'schedule.generate') {
     const value = z
@@ -90,13 +95,11 @@ export async function planningAction(userId: string, b: any) {
       })
       .strict()
       .parse(b.data);
-    return generateSchedule(
-      await snapshot(),
-      Date.now(),
-      value.startDate,
-      value.endDate,
-      value.excluded,
-    );
+    const d = await snapshot();
+    return {
+      fingerprint: planningFingerprint(d),
+      ...generateSchedule(d, Date.now(), value.startDate, value.endDate, value.excluded),
+    };
   }
   if (b.action === 'availability.save') return saveAvailability(userId, b.data);
   if (b.action === 'commitment.save') return saveCommitment(userId, b.data);
@@ -126,6 +129,40 @@ export async function saveWorkEstimate(userId: string, input: unknown) {
       where: { userId_workKey: { userId, workKey: value.workKey } },
       create: { userId, workKey: value.workKey, minutes: value.minutes, revision: 1 },
       update: { minutes: value.minutes, revision: { increment: 1 } },
+    });
+  });
+}
+
+export async function setBlockLock(userId: string, input: unknown) {
+  const value = z
+    .object({ id: z.string(), revision: revisionSchema, locked: z.boolean() })
+    .strict()
+    .parse(input);
+  return db.$transaction(async (tx) => {
+    const old = await tx.plannedWorkBlock.findFirst({ where: { id: value.id, userId } });
+    if (!old || old.state !== 'planned')
+      throw new AppError('This planned session is no longer editable.', 409);
+    if (old.revision !== value.revision)
+      throw new AppError('This planned session changed. Reload before editing.', 409);
+    return tx.plannedWorkBlock.update({
+      where: { id: value.id },
+      data: { locked: value.locked, revision: { increment: 1 } },
+    });
+  });
+}
+export async function dismissBlock(userId: string, input: unknown) {
+  const value = z.object({ id: z.string(), revision: revisionSchema }).strict().parse(input);
+  return db.$transaction(async (tx) => {
+    const old = await tx.plannedWorkBlock.findFirst({ where: { id: value.id, userId } });
+    if (!old || old.state !== 'planned')
+      throw new AppError('This planned session is no longer editable.', 409);
+    if (old.revision !== value.revision)
+      throw new AppError('This planned session changed. Reload before editing.', 409);
+    if (old.timerId && (await tx.studyTimer.findUnique({ where: { id: old.timerId } }))?.activeKey)
+      throw new AppError('Finish or discard its active timer before removing this plan.', 409);
+    return tx.plannedWorkBlock.update({
+      where: { id: value.id },
+      data: { state: 'dismissed', revision: { increment: 1 } },
     });
   });
 }

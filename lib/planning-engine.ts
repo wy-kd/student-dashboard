@@ -248,7 +248,11 @@ export function generateSchedule(
           cap = soft ? Math.min(maximum, d.setting.dailyHours * 60) : maximum;
         let budget = Math.max(0, cap - dayUsed.get(date)!);
         for (const slot of slots.get(date)!) {
-          while (remaining >= preferences.minimumMinutes && budget >= preferences.minimumMinutes) {
+          while (
+            remaining >= preferences.minimumMinutes &&
+            budget >= preferences.minimumMinutes &&
+            suggestions.length < 200
+          ) {
             const room = (Math.min(slot.end, due) - slot.start) / minute;
             if (room < preferences.minimumMinutes) break;
             let duration = Math.min(remaining, preferences.preferredMinutes, room, budget);
@@ -288,6 +292,10 @@ export function generateSchedule(
           'This work cannot fit before its deadline with current availability, reservations, session lengths and daily limits.',
       });
   }
+  if (suggestions.length >= 200)
+    warnings.push(
+      'This preview is limited to 200 blocks. Use a shorter period or longer preferred sessions to review further allocations.',
+    );
   suggestions.sort((a, b) => a.startAt - b.startAt || a.id.localeCompare(b.id));
   const occupied = occupiedBetween(d, startDate, endDate),
     conflicts: string[] = [];
@@ -304,7 +312,11 @@ export function generateSchedule(
     unallocatedMinutes = Math.max(0, capacityMinutes - allocated);
   const incomplete =
     unscheduled.some((x) => x.minutes == null) ||
-    !(d.planning?.windows.length || d.planning?.exceptions.some((e) => e.windows.length));
+    !(
+      d.planning?.windows.length ||
+      d.planning?.exceptions.length ||
+      (d.planning?.preference.revision ?? 0) > 0
+    );
   const status = incomplete
     ? 'Insufficient information'
     : unscheduled.length || conflicts.length

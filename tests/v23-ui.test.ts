@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import React, { act } from 'react';
 import { AppContext } from '../components/context';
+import { SchedulePlanning } from '../components/SchedulePlanning';
+import { generateSchedule } from '../lib/planning-engine';
+import { instant } from '../lib/planning-time';
 import { Availability } from '../components/Availability';
 import { entities, type Data } from '../lib/model';
 import { availabilitySchema, defaultPlanningPreferences } from '../lib/planning-model';
@@ -51,6 +54,10 @@ const data = {
     batches: [],
   },
 } as unknown as Data;
+let approvalWrites = 0,
+  interruptApproval = false;
+const approvalRequests: any[] = [];
+const approved = new Map<string, any>();
 let node: React.ReactNode,
   writes = 0,
   fail = false,
@@ -125,6 +132,43 @@ globalThis.fetch = async (_url: any, init: any) => {
     data.planning!.exceptions = value.exceptions;
     return new Response(JSON.stringify({ result: data.planning!.preference }));
   }
+  if (action === 'schedule.generate')
+    return new Response(
+      JSON.stringify({
+        result: {
+          fingerprint: 'a'.repeat(64),
+          ...generateSchedule(
+            data,
+            instant('2026-10-12T08:00', 'Australia/Brisbane'),
+            payload.startDate,
+            payload.endDate,
+            payload.excluded,
+          ),
+        },
+      }),
+    );
+  if (action === 'schedule.approve') {
+    approvalRequests.push(structuredClone(payload));
+    let receipt = approved.get(payload.requestId);
+    if (!receipt) {
+      approvalWrites++;
+      receipt = { batchId: payload.requestId, state: 'approved' };
+      approved.set(payload.requestId, receipt);
+      data.planning!.blocks.push(
+        ...payload.changes.map((change: any) => ({
+          ...change,
+          id: payload.requestId + ':' + change.id,
+          state: 'planned',
+          revision: 0,
+        })),
+      );
+    }
+    if (interruptApproval) {
+      interruptApproval = false;
+      throw Error('Interrupted response');
+    }
+    return new Response(JSON.stringify({ result: receipt }));
+  }
   throw Error('Unexpected UI request');
 };
 test('Availability editor copies days, edits multiple periods/exceptions, preserves failed drafts and resets without saving', async () => {
@@ -166,6 +210,69 @@ test('Availability editor copies days, edits multiple periods/exceptions, preser
   await submit(document.querySelector('form')!);
   assert.deepEqual(lastPayload.exceptions, []);
 });
+
+test('Scheduling preview edits and selective approval retain uncertain requests, while Cancel makes no changes', async () => {
+  data.task = [
+    {
+      id: 'work',
+      name: 'Primary task',
+      estimatedHours: 2,
+      actualHours: 0,
+      status: 'Not Started',
+      priority: 'Medium',
+      dueAt: '2026-10-20T11:00',
+    },
+    {
+      id: 'alternative',
+      name: 'Alternative task',
+      estimatedHours: 1,
+      actualHours: 0,
+      status: 'Not Started',
+      priority: 'Low',
+      dueAt: '2026-10-20T11:00',
+    },
+  ];
+  await render(React.createElement(SchedulePlanning));
+  await click(button('Plan my week'));
+  assert.ok(document.querySelector('[aria-label="Schedule preview"]'));
+  assert.equal(approvalWrites, 0);
+  await click(button('Cancel proposal'));
+  assert.equal(approvalWrites, 0);
+  assert.equal(data.planning!.blocks.length, 0);
+  await click(button('Plan my week'));
+  const cards = Array.from(document.querySelectorAll('.planning-suggestion'));
+  assert.ok(cards.length > 1);
+  for (const card of cards.slice(1))
+    await click(card.querySelector('input[type=checkbox]') as HTMLElement);
+  const first = cards[0];
+  await select(first.querySelector('select')!, 'task:alternative');
+  const times = first.querySelectorAll('input[type=datetime-local]');
+  await input(times[0] as HTMLInputElement, '2026-10-12T14:00');
+  await input(times[1] as HTMLInputElement, '2026-10-12T15:00');
+  await click(first.querySelectorAll('input[type=checkbox]')[1] as HTMLElement);
+  interruptApproval = true;
+  await click(button('Accept selected changes'));
+  assert.equal(approvalWrites, 1);
+  assert.match(document.body.textContent!, /approval response was interrupted/);
+  assert.ok(button('Retry same approval'));
+  assert.ok((first.querySelector('select') as HTMLSelectElement).matches(':disabled'));
+  await click(button('Retry same approval'));
+  assert.equal(approvalWrites, 1);
+  assert.equal(approvalRequests.length, 2);
+  assert.deepEqual(approvalRequests[0], approvalRequests[1]);
+  assert.equal(approvalRequests[0].changes.length, 1);
+  assert.equal(approvalRequests[0].changes[0].workKey, 'task:alternative');
+  assert.equal(approvalRequests[0].changes[0].override, true);
+  assert.equal(
+    approvalRequests[0].changes[0].startAt,
+    instant('2026-10-12T14:00', 'Australia/Brisbane'),
+  );
+  assert.ok(!document.querySelector('[aria-label="Schedule preview"]'));
+  assert.match(document.body.textContent!, /No study time or Task completion was recorded/);
+  assert.equal(data.studySession.length, 0);
+  assert.equal(data.task[0].status, 'Not Started');
+});
+
 test.after(async () => {
   await act(async () => root.unmount());
   globalThis.fetch = oldFetch;

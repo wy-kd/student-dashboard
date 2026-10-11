@@ -5,6 +5,11 @@ export async function requestPlanning(action: string, data: any) {
     body: JSON.stringify({ action, data }),
   });
   const body = await response.json();
-  if (!response.ok) throw Error(body.error ?? 'Planning request failed.');
+  if (!response.ok) {
+    const error = Object.assign(Error(body.error ?? 'Planning request failed.'), {
+      status: response.status,
+    });
+    throw error;
+  }
   return body.result;
 }

@@ -2,6 +2,7 @@
 import { DateTimeInput } from './DateTimeInput';
 import { formatDate, formatTime } from '@/lib/format';
 import { useState } from 'react';
+import { SchedulePlanning } from './SchedulePlanning';
 import { SemesterWeek } from './SemesterWeek';
 import { StudyTimer } from './StudyTimer';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -209,6 +210,7 @@ export function Study() {
         sub="Make time for focused work, then record the time you actually spent."
         entity="studySession"
       />
+      <SchedulePlanning />
       <Section title="Study timer">
         <StudyTimer />
       </Section>

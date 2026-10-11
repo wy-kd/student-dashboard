@@ -4049,3 +4049,64 @@ td:first-child {
 .availability-day .text-button {
   min-height: 44px;
 }
+
+.planning-workspace {
+  min-width: 0;
+}
+.planning-work-item,
+.planning-suggestion {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-block: 12px;
+  min-width: 0;
+}
+.planning-preview-list {
+  display: grid;
+  gap: 12px;
+}
+.planning-suggestion {
+  background: var(--surface);
+}
+.planning-suggestion-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.planning-suggestion input,
+.planning-suggestion select {
+  min-width: 0;
+  max-width: 100%;
+}
+.planning-unscheduled {
+  border-left: 3px solid var(--line);
+  padding-left: 16px;
+}
+.planning-estimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.planning-estimate p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.planning-estimate .field {
+  flex: 1;
+  min-width: min(100%, 180px);
+}
+.planning-workspace .check,
+.planning-workspace button {
+  min-height: 44px;
+}
+#availability {
+  scroll-margin-top: 24px;
+}
+@media (max-width: 640px) {
+  .planning-suggestion .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

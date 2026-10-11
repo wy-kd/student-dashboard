@@ -112,7 +112,9 @@ export function Settings() {
           </button>
         </form>
       </Section>
-      <Availability />
+      <div id="availability">
+        <Availability />
+      </div>
       <NotificationSettings />
       <details className="more-fields">
         <summary>Semesters & data maintenance</summary>

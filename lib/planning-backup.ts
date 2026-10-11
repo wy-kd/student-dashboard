@@ -29,7 +29,7 @@ export function parsePlanning(input: any) {
             ? z.number().int().nonnegative()
             : f.type === 'Float'
               ? z.number().finite().nonnegative()
-              : z.string().max(f.name === 'payload' ? 100000 : f.name === 'windows' ? 5000 : 500);
+              : z.string().max(f.name === 'payload' ? 500000 : f.name === 'windows' ? 5000 : 500);
       if (!f.isRequired) rule = rule.nullable();
       shape[f.name] = rule;
     }
