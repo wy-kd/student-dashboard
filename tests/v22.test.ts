@@ -491,7 +491,7 @@ test('normal Task IDs, academic history and credentials survive unchanged backup
     completed: true,
   });
   const backup = await exportBackup();
-  assert.equal(backup.version, 2);
+  assert.equal(backup.version, 3);
   assert.match(toCsv(backup.data.task), /Backup research/);
   await restoreBackup(backup);
   assert.deepEqual(await saveAssignmentBreakdown(payload), ids);

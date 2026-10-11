@@ -1,3 +1,5 @@
+import { exportPlanning, clearPlanning } from './planning-store';
+import { parsePlanning, restorePlanning } from './planning-backup';
 import {
   exportProductivity,
   parseProductivity,
@@ -26,10 +28,11 @@ export const exportOrder: Entity[] = [
 export async function exportBackup() {
   return db.$transaction(async (tx) => ({
     format: 'student-dashboard',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
-    data: await snapshot(tx),
+    data: await snapshot(tx).then(({ planning, ...data }) => data),
     productivity: await exportProductivity(tx),
+    scheduling: await exportPlanning(tx),
   }));
 }
 export async function saveBackup() {
@@ -40,9 +43,10 @@ export async function saveBackup() {
   return path;
 }
 export async function restoreBackup(input: any) {
-  if (input?.format !== 'student-dashboard' || ![1, 2].includes(input.version) || !input.data)
+  if (input?.format !== 'student-dashboard' || ![1, 2, 3].includes(input.version) || !input.data)
     throw new AppError('This is not a supported Student Dashboard backup.');
-  const extra = input.version === 2 ? parseProductivity(input.productivity) : null;
+  const extra = input.version >= 2 ? parseProductivity(input.productivity) : null;
+  const scheduling = input.version === 3 ? parsePlanning(input.scheduling) : null;
   const data = input.data;
   const parsed: any = {};
   let count = 0;
@@ -104,6 +108,8 @@ export async function restoreBackup(input: any) {
           if (old) row.revision = Math.max(row.revision, old.revision + 1);
         }
       }
+      const previousPlanning = await exportPlanning(tx);
+      await clearPlanning(tx);
       await clearProductivity(tx);
       for (const e of [...exportOrder].reverse()) await c[e].deleteMany();
       for (const e of exportOrder)
@@ -112,6 +118,7 @@ export async function restoreBackup(input: any) {
           await c[e].create({ data: row });
         }
       await restoreProductivity(tx, extra);
+      await restorePlanning(tx, scheduling, previousPlanning);
       await tx.setting.upsert({
         where: { id: 'settings' },
         create: { id: 'settings', ...setting },

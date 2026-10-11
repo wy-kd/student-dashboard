@@ -1,3 +1,4 @@
+import { planningSnapshot } from './planning-store';
 import { z } from 'zod';
 import { db } from './db';
 import { entities, fields, type Entity, type Data, defaults } from './model';
@@ -21,7 +22,11 @@ export async function snapshot(client: any = db): Promise<Data> {
     dailyHours: 3,
     activeSemesterId: null,
   };
-  return { ...Object.fromEntries(entities.map((e, i) => [e, rows[i]])), setting } as Data;
+  return {
+    ...Object.fromEntries(entities.map((e, i) => [e, rows[i]])),
+    setting,
+    planning: await planningSnapshot(client),
+  } as Data;
 }
 export async function validateRelations(client: any, entity: Entity, row: any, id?: string) {
   for (const f of fields[entity])
@@ -130,6 +135,8 @@ export async function deleteRow(entity: Entity, id: string, revision: number) {
     if (row.revision !== revision)
       throw new AppError('This record changed. Refresh before deleting.', 409);
     try {
+      if (['task', 'assignment', 'exam'].includes(entity))
+        await tx.workEstimate.deleteMany({ where: { workKey: entity + ':' + id } });
       await client[entity].delete({ where: { id } });
     } catch (e: any) {
       if (e.code === 'P2003')

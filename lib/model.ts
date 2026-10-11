@@ -16,6 +16,7 @@ export const entities = [
 export type Entity = (typeof entities)[number];
 export type Data = { [K in Entity]: RecordRow[] } & {
   productivity?: any;
+  planning?: import('./planning-model').PlanningState;
   setting: { name: string; timezone: string; dailyHours: number; activeSemesterId: string | null };
 };
 export type Field = {

@@ -21,6 +21,13 @@ model User {
   failedAttempts Int @default(0)
   lockedUntil Float @default(0)
   sessions Session[]
+  schedulingPreference SchedulingPreference?
+  availabilityWindows AvailabilityWindow[]
+  availabilityExceptions AvailabilityException[]
+  commitments Commitment[]
+  workEstimates WorkEstimate[]
+  plannedBlocks PlannedWorkBlock[]
+  scheduleBatches ScheduleBatch[]
 }
 model Session {
   id String @id
@@ -76,6 +83,7 @@ model Subject {
   @@index([semesterId])
 }
 model Assignment {
+  plannedBlocks PlannedWorkBlock[]
   submittedAt String?
   timers StudyTimer[]
   recurrences Recurrence[]
@@ -107,6 +115,7 @@ model Assignment {
   @@index([dueAt])
 }
 model Task {
+  plannedBlocks PlannedWorkBlock[]
   timers StudyTimer[]
   occurrence TaskOccurrence?
   reminders Reminder[]
@@ -145,6 +154,7 @@ model Milestone {
   @@index([assignmentId])
 }
 model Exam {
+  plannedBlocks PlannedWorkBlock[]
   timers StudyTimer[]
   reminders Reminder[]
 
@@ -200,6 +210,7 @@ model Class {
   @@index([subjectId])
 }
 model StudySession {
+  plannedBlock PlannedWorkBlock?
   timer StudyTimer?
   reminders Reminder[]
 
@@ -280,6 +291,7 @@ model Preference {
   privatePush Boolean @default(true)
 }
 model StudyTimer {
+  plannedBlock PlannedWorkBlock?
   id String @id @default(cuid())
   userId String
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -425,4 +437,97 @@ model TodoItem {
   position Int @default(0)
   revision Int @default(0)
   @@index([userId, position])
+}
+
+// V2.3: planning intentions are separate from reviewed StudySession records.
+model SchedulingPreference {
+  userId           String @id
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revision         Int    @default(0)
+  preferredMinutes Int    @default(50)
+  minimumMinutes   Int    @default(20)
+  restMinutes      Int    @default(10)
+  maxDailyMinutes  Int?
+}
+
+model AvailabilityWindow {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       Int
+  startTime String
+  endTime   String
+}
+
+model AvailabilityException {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date    String
+  windows String @default("[]")
+
+  @@unique([userId, date])
+}
+
+model Commitment {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name     String
+  startAt  Float
+  endAt    Float
+  fixed    Boolean @default(true)
+  revision Int     @default(0)
+
+  @@index([userId, startAt])
+}
+
+model WorkEstimate {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workKey  String
+  minutes  Float
+  revision Int    @default(0)
+
+  @@unique([userId, workKey])
+}
+
+model ScheduleBatch {
+  id          String             @id
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestHash String
+  payload     String
+  state       String             @default("approved")
+  createdAt   Float
+  blocks      PlannedWorkBlock[]
+}
+
+model PlannedWorkBlock {
+  workKey String?
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  taskId       String?
+  task         Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  assignmentId String?
+  assignment   Assignment?    @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  examId       String?
+  exam         Exam?          @relation(fields: [examId], references: [id], onDelete: SetNull)
+  startAt      Float
+  endAt        Float
+  state        String         @default("planned")
+  origin       String         @default("manual")
+  locked       Boolean        @default(false)
+  revision     Int            @default(0)
+  batchId      String?
+  batch        ScheduleBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  sessionId    String?        @unique
+  session      StudySession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  timerId      String?        @unique
+  timer        StudyTimer?    @relation(fields: [timerId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startAt])
 }

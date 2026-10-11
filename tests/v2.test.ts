@@ -1020,7 +1020,7 @@ test('to-do backups restore content/order/completion, reject invalid data and ac
 });
 test('V2 JSON backup round-trips new relational state and V1 still imports without touching auth', async () => {
   const backup = await exportBackup();
-  assert.equal(backup.version, 2);
+  assert.equal(backup.version, 3);
   await assert.rejects(restoreBackup({ ...backup, productivity: undefined }), /Missing V2/);
   assert.equal(JSON.stringify(backup).includes('SECRET'), false);
   const hash = (await db.user.findUniqueOrThrow({ where: { id: 'owner' } })).passwordHash;
