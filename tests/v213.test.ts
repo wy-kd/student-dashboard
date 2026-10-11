@@ -130,9 +130,11 @@ test('to-do preview shows five pending checkboxes, quick add and view all; Tasks
   assert.match(html, /View all to-dos/);
   const page = render(React.createElement(Tasks), d);
   assert.match(page, /id="todo-list"/);
-  assert.match(page, /Edit to-do Reminder 0/);
+  assert.match(page, /Edit to-do Reminder 1/);
   assert.match(page, /aria-label="Task view"/);
-  assert.match(page, /Your recurring series/);
+  assert.match(page, /class="workspace-recurring"/);
+  assert.doesNotMatch(page, /Your recurring series/);
+  assert.match(page, /<option selected="">All<\/option>/);
 });
 test('saved dashboard layouts gain only missing hidden widgets and keep existing customisations', () => {
   const old = defaultLayout();

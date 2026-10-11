@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current release: **V2.2 — Assignment Breakdown & Task Integration**. See the [backup-first Acer update, recovery and device guide](docs/V2.2-GUIDE.md).
+Current release: **V2.2.1 — Tasks Workspace & Assignment Dialog Polish**. See the [backup-first Acer update, recovery and device guide](docs/V2.2.1-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -601,3 +601,13 @@ Details, Tasks and Today use the same completion/edit controls and parent links.
 To-dos remain lightweight. **Convert to Task** is explicit and prefilled; creation and removal of the original happen atomically. Failure preserves the To-do and uncertain successful retries acknowledge the same Task. Semester Progress now displays **QUT Y1S2 | Week 11 of 13** in one uniformly styled, naturally wrapping strong text element; Dashboard's small date/week header and all special semester states remain.
 
 See the [V2.2 guide](docs/V2.2-GUIDE.md) for usage, retry/storage limits, exact backup verification/update/recovery commands and physical device checks. No database migration, dependency, timer architecture, authentication, backup-format, Windows, Tailscale or PWA infrastructure changes. Spotify remains outside this release.
+
+## V2.2.1 Tasks workspace and assignment dialog polish
+
+Academic Tasks now lead a two-panel workspace beside Quick To-dos. At least 860px of available content width gives approximately 62%/38% columns; narrower areas stack Tasks first. Recurring Tasks is collapsed below. All is the initial academic filter, using the existing selected-semester scope. Each list initially shows six outstanding items, with in-place Show more/less and collapsed completed sections; the explicit Completed task filter remains.
+
+Edit common Task or To-do fields directly inside their rows. One quick editor is open at a time, with Save/Cancel, native form submission and Escape. Original revision checks protect against another device's edits; errors retain unsaved input. Task estimates use Hours/Minutes while untouched precision, advanced fields and actual study time are preserved. More details retains the full Task editor. Completion uses the existing authoritative mutations. Less common actions, including safe atomic Convert to Task, move into accessible ellipsis menus.
+
+Assignment-created and breakdown dialogs share consistent spacing and controls. The actual assignment is clearly labelled. Breakdown has a scrolling body and separate footer, valid-selection Save gating and quieter progress help; all V2.2 templates/drafts/retries remain. No migration, backend API, production dependency or infrastructure change. A pinned development-only jsdom dependency supports interaction regression tests.
+
+Use the [V2.2.1 guide](docs/V2.2.1-GUIDE.md) for detailed behaviour, exact backup/count/hash verification, Acer update commands, separate JSON/full database/environment recovery and physical acceptance checks. Spotify remains outside this release.

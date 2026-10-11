@@ -36,6 +36,12 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.breakdown-methods[^}]*flex-wrap:wrap/);
   assert.match(css, /\.assignment-form-group legend\{[^}]*font-weight:700/);
   assert.match(css, /\.semester-summary\{[^}]*line-height:1\.5/);
+  assert.match(css, /container:taskspace\/inline-size/);
+  assert.match(css, /grid-template-columns:minmax\(0,1\.6fr\) minmax\(0,1fr\)/);
+  assert.match(css, /\.assignment-dialog-body\{[^}]*overflow-y:auto/);
+  assert.match(css, /\.assignment-dialog-footer\{[^}]*flex-shrink:0/);
+  assert.match(css, /\.quick-editor-grid\{[^}]*display:grid/);
+  assert.match(css, /\.workspace-row-actions \.icon-button\{[^}]*min-width:44px/);
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

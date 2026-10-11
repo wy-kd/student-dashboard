@@ -1,4 +1,5 @@
 'use client';
+import { AssignmentCreated } from './AssignmentCreated';
 import { AssignmentBreakdown, ManualProgressNotice } from './AssignmentBreakdown';
 import { todoRequestId } from '@/lib/todo-request-id';
 import { SemesterBreaks } from './SemesterBreaks';
@@ -160,22 +161,7 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
   if (created && breaking) return <AssignmentBreakdown assignment={created} close={close} />;
   if (created)
     return (
-      <dialog ref={dialog} className="editor" aria-label="Assignment created" onCancel={close}>
-        <div className="assignment-created">
-          <h2>Assignment created</h2>
-          <p>{created.name}</p>
-          <p>Would you like to break this assignment into smaller tasks?</p>
-          <p className="muted">Your assignment is safely saved. This step is optional.</p>
-          <div className="dialog-actions">
-            <button className="button secondary" onClick={close}>
-              Maybe later
-            </button>
-            <button className="button primary" onClick={() => setBreaking(true)}>
-              Break into tasks
-            </button>
-          </div>
-        </div>
-      </dialog>
+      <AssignmentCreated assignment={created} close={close} breakdown={() => setBreaking(true)} />
     );
   return (
     <dialog

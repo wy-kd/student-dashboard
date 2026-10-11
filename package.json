@@ -37,6 +37,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@types/web-push": "3.6.4",
+    "jsdom": "26.1.0",
     "prettier": "^3.6.2",
     "tailwindcss": "4.1.16",
     "typescript": "5.9.3"

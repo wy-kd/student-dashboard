@@ -1,8 +1,11 @@
 'use client';
 import { formatDate, formatTime } from '@/lib/format';
 import { Pencil, Trash2, Plus, ArrowUpRight, Check } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProductivity } from './productivity';
+import { RowMenu } from './RowMenu';
+import { useQuickEdit } from './QuickEditScope';
+import { TaskQuickEditor } from './TaskQuickEditor';
 import { todoRequestId } from '@/lib/todo-request-id';
 import { useApp, subjectName } from './context';
 import { fields, type Entity, type RecordRow } from '@/lib/model';
@@ -127,24 +130,77 @@ export function Due({ at, exam = false }: { at: string; exam?: boolean }) {
   const { now } = useApp();
   return <span className={at < now ? 'due overdue' : 'due'}>{countdown(at, now, exam)}</span>;
 }
-export function TaskRow({ row }: { row: RecordRow }) {
-  const { save, notify, allData, go, act } = useProductivity();
+export function TaskRow({ row, quick = false }: { row: RecordRow; quick?: boolean }) {
+  const { save, remove, open, notify, allData, go, act } = useProductivity();
+  const editor = useQuickEdit(),
+    editButton = useRef<HTMLButtonElement>(null);
+  const editing = quick && editor.active === `task:${row.id}`;
+  const pendingFocus = useRef(false);
+  const close = () => {
+    pendingFocus.current = true;
+    editor.close();
+  };
   const requestId = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (pendingFocus.current && !editing && !busy && !editor.busy) {
+      editButton.current?.focus();
+      pendingFocus.current = false;
+    }
+  }, [editing, busy, editor.busy]);
   const completed = row.status === 'Completed';
-  return (
-    <div className={'task-row ' + (completed ? 'is-done' : '')}>
-      <input
-        autoComplete="off"
-        aria-label={'Complete ' + row.name}
-        type="checkbox"
-        checked={completed}
-        onChange={() =>
-          save('task', { ...row, status: completed ? 'Not Started' : 'Completed' }, row).catch(
-            (e) => notify(e.message),
-          )
+  async function startFocus() {
+    if (busy) return;
+    setBusy(true);
+    requestId.current ??= todoRequestId();
+    try {
+      await act('timer.start', {
+        timer: {
+          requestId: requestId.current,
+          name: row.name,
+          taskId: row.id,
+          mode: 'countdown',
+          focusMinutes: 50,
+          breakMinutes: 10,
+          rounds: 1,
+        },
+      });
+      requestId.current = null;
+      go('/focus');
+    } catch (e: any) {
+      notify(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const checkbox = (
+    <input
+      autoComplete="off"
+      aria-label={(completed ? 'Reopen ' : 'Complete ') + row.name}
+      type="checkbox"
+      checked={completed}
+      disabled={busy || (quick && (editor.busy || editing))}
+      onChange={async () => {
+        if (busy || (quick && editor.busy)) return;
+        if (quick && !editor.startSaving()) return;
+        setBusy(true);
+        try {
+          await save('task', { ...row, status: completed ? 'Not Started' : 'Completed' }, row);
+        } catch (e: any) {
+          notify(e.message);
+        } finally {
+          setBusy(false);
+          if (quick) editor.saving(false);
         }
-      />
+      }}
+    />
+  );
+  return (
+    <div
+      className={'task-row ' + (quick ? 'workspace-task-row ' : '') + (completed ? 'is-done' : '')}
+    >
+      {quick ? <label className="workspace-task-check">{checkbox}</label> : checkbox}
       <div className="grow">
         <strong>{row.name}</strong>
         <div className="metadata">
@@ -170,38 +226,77 @@ export function TaskRow({ row }: { row: RecordRow }) {
         </div>
       </div>
       <Badge>{row.priority}</Badge>
-      {!completed && (
-        <button
-          className="button secondary task-focus"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            requestId.current ??= todoRequestId();
-            try {
-              await act('timer.start', {
-                timer: {
-                  requestId: requestId.current,
-                  name: row.name,
-                  taskId: row.id,
-                  mode: 'countdown',
-                  focusMinutes: 50,
-                  breakMinutes: 10,
-                  rounds: 1,
+      {quick ? (
+        <div className="workspace-row-actions">
+          <button
+            type="button"
+            className="icon-button quick-edit-trigger"
+            ref={editButton}
+            disabled={busy || editor.busy}
+            aria-label={'Edit ' + row.name}
+            aria-expanded={editing}
+            onClick={() => {
+              if (editing) close();
+              else editor.begin(`task:${row.id}`);
+            }}
+          >
+            <Pencil size={17} />
+          </button>
+          <RowMenu
+            name={row.name}
+            disabled={busy || editor.busy}
+            actions={[
+              ...(!completed
+                ? [
+                    {
+                      label: 'Start Focus',
+                      run: () => {
+                        if (editor.leave()) void startFocus();
+                      },
+                    },
+                  ]
+                : []),
+              {
+                label: 'More details',
+                run: () => {
+                  if (editor.leave()) open({ entity: 'task', row });
                 },
-              });
-              requestId.current = null;
-              go('/focus');
-            } catch (e: any) {
-              notify(e.message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Focus
-        </button>
+              },
+              {
+                label: 'Delete task',
+                destructive: true,
+                run: async () => {
+                  if (!confirm(`Delete ${row.name}? Linked records must be removed first.`)) return;
+                  if (!editor.startSaving()) return;
+                  try {
+                    await remove('task', row);
+                    editor.saving(false);
+                    if (editing) close();
+                  } catch (e: any) {
+                    notify(e.message);
+                  } finally {
+                    editor.saving(false);
+                  }
+                },
+              },
+            ]}
+          />
+        </div>
+      ) : (
+        <>
+          {!completed && (
+            <button
+              className="button secondary task-focus"
+              disabled={busy}
+              onClick={() => void startFocus()}
+            >
+              Focus
+            </button>
+          )}
+          <RecordActions entity="task" row={row} />
+        </>
       )}
-      <RecordActions entity="task" row={row} />
+      {editing && <TaskQuickEditor row={row} close={close} />}
     </div>
   );
 }

@@ -3,8 +3,7 @@ import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
 import { AssignmentBreakdown } from './AssignmentBreakdown';
 import { assignmentTaskSummary } from '@/lib/assignment-breakdown';
-import { RecurringTasks } from './RecurringTasks';
-import { TodoList } from './TodoList';
+import { TasksWorkspace } from './TasksWorkspace';
 import { Plus, ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { useApp, titleFor } from './context';
 import {
@@ -19,12 +18,10 @@ import {
   Due,
 } from './ui';
 import {
-  addDays,
   assignmentProgress,
   examProgress,
   health,
   remaining,
-  weekday,
   round,
 } from '@/lib/calculations';
 import { fields, type Entity, type RecordRow } from '@/lib/model';
@@ -66,106 +63,7 @@ export function Heading({
   );
 }
 export function Tasks() {
-  const { data: d, now } = useApp();
-  const [filter, setFilter] = useState('Today'),
-    [query, setQuery] = useState('');
-  const today = now.slice(0, 10),
-    endWeek = addDays(today, 7 - (weekday(today) || 7));
-  const options = [
-    'Today',
-    'Tomorrow',
-    'This Week',
-    'Upcoming',
-    'Overdue',
-    'Completed',
-    'By Subject',
-    'By Assignment',
-    'All',
-  ];
-  let tasks = d.task
-    .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
-    .filter((t) =>
-      filter === 'All'
-        ? true
-        : filter === 'Completed'
-          ? t.status === 'Completed'
-          : t.status !== 'Completed',
-    );
-  tasks = tasks
-    .filter((t) =>
-      filter === 'Today'
-        ? t.dueAt?.slice(0, 10) === today
-        : filter === 'Tomorrow'
-          ? t.dueAt?.slice(0, 10) === addDays(today, 1)
-          : filter === 'This Week'
-            ? t.dueAt && t.dueAt.slice(0, 10) >= today && t.dueAt.slice(0, 10) <= endWeek
-            : filter === 'Overdue'
-              ? t.dueAt && t.dueAt < now
-              : filter === 'Upcoming'
-                ? t.dueAt && t.dueAt >= now
-                : true,
-    )
-    .sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'));
-  const groups: Record<string, RecordRow[]> = {};
-  for (const t of tasks) {
-    const key =
-      filter === 'By Subject'
-        ? (d.subject.find((s) => s.id === t.subjectId)?.code ?? 'Personal')
-        : filter === 'By Assignment'
-          ? (d.assignment.find((a) => a.id === t.assignmentId)?.name ?? 'Standalone / exam tasks')
-          : 'Tasks';
-    (groups[key] ??= []).push(t);
-  }
-  return (
-    <>
-      <Heading title="Tasks" sub="Turn bigger goals into the next small step." entity="task" />
-      <section id="todo-list" className="todo-section" aria-labelledby="todo-heading">
-        <h2 id="todo-heading">To-do list</h2>
-        <p className="muted">A quick personal checklist, separate from your academic tasks.</p>
-        <TodoList />
-      </section>
-      <RecurringTasks />
-      <section className="ordinary-tasks" aria-labelledby="tasks-list-heading">
-        <h2 id="tasks-list-heading">Tasks</h2>
-        <div className="toolbar">
-          <label>
-            Show{' '}
-            <select
-              aria-label="Task view"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              {options.map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-          </label>
-          <input
-            autoComplete="off"
-            aria-label="Filter tasks"
-            placeholder="Filter tasks…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {Object.entries(groups).map(([key, rows]) => (
-          <Section key={key} title={key} sub={`${rows.length} tasks`}>
-            {rows.map((t) => (
-              <TaskRow key={t.id} row={t} />
-            ))}
-          </Section>
-        ))}
-        {!tasks.length && (
-          <Section title={filter}>
-            <Empty
-              title="You’re clear here"
-              text="Switch views to see other tasks, or add a new one."
-            />
-          </Section>
-        )}
-      </section>
-    </>
-  );
+  return <TasksWorkspace />;
 }
 export function Assessments({ exam = false }: { exam?: boolean }) {
   const { data: d } = useApp();

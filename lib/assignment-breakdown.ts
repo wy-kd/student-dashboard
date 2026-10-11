@@ -1,3 +1,5 @@
+import { defaults } from './model';
+import { schemaFor } from './validation';
 import type { Data, RecordRow } from './model';
 export const breakdownTemplates = {
   'Research report': [
@@ -113,4 +115,18 @@ export function selectedBreakdownTasks(rows: BreakdownDraft[]) {
       priority: row.priority,
       status: row.status,
     }));
+}
+
+const draftTaskSchema = schemaFor('task');
+export function breakdownDraftValid(rows: BreakdownDraft[]) {
+  const selected = selectedBreakdownTasks(rows);
+  return (
+    selected.length > 0 &&
+    selected.length <= 50 &&
+    selected.every(
+      (row) =>
+        row.name.trim().length > 0 &&
+        draftTaskSchema.safeParse({ ...defaults('task'), ...row }).success,
+    )
+  );
 }

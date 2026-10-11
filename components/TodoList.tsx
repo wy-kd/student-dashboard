@@ -1,40 +1,279 @@
 'use client';
-import { useRef, useState } from 'react';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { useProductivity } from './productivity';
 import { TodoConversion } from './TodoConversion';
 import { DateTimeInput } from './DateTimeInput';
+import { RowMenu } from './RowMenu';
+import { useQuickEdit } from './QuickEditScope';
 import { formatDate } from '@/lib/format';
 import type { TodoRow } from '@/lib/todos';
 import { todoRequestId } from '@/lib/todo-request-id';
-
-export function TodoList({ compact = false }: { compact?: boolean }) {
-  const { state, act, reload, go } = useProductivity();
-  const rows: TodoRow[] = state?.todos ?? [];
-  const pending = rows.filter((row) => !row.completed);
-  const visible = compact ? pending.slice(0, 5) : rows;
+import { cancelQuickEditKey, listPageSize } from '@/lib/task-workspace';
+export function TodoList({
+  compact = false,
+  workspace = false,
+}: {
+  compact?: boolean;
+  workspace?: boolean;
+}) {
+  const { state, act, reload, go } = useProductivity(),
+    editor = useQuickEdit();
+  const rows: TodoRow[] = state?.todos ?? [],
+    pending = rows.filter((row) => !row.completed),
+    completed = rows.filter((row) => row.completed);
+  const [limit, setLimit] = useState(listPageSize),
+    [completedLimit, setCompletedLimit] = useState(listPageSize),
+    [completedOpen, setCompletedOpen] = useState(false);
   const [name, setName] = useState(''),
-    [dueDate, setDueDate] = useState('');
-  const [busy, setBusy] = useState(false),
+    [dueDate, setDueDate] = useState(''),
+    [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [editing, setEditing] = useState<{ old: TodoRow; name: string; dueDate: string } | null>(
-    null,
-  );
-  const [converting, setConverting] = useState<TodoRow | null>(null);
-  const request = useRef<{ key: string; id: string } | null>(null);
+      null,
+    ),
+    [converting, setConverting] = useState<TodoRow | null>(null);
+  const request = useRef<{ key: string; id: string } | null>(null),
+    editButtons = useRef(new Map<string, HTMLButtonElement>());
+  const pendingFocus = useRef<string | null>(null);
+  const disabled = busy || editor.busy;
+  function finish() {
+    const id = editing?.old.id;
+    editor.close();
+    setEditing(null);
+    if (id) pendingFocus.current = id;
+  }
+  useEffect(() => {
+    if (pendingFocus.current && !disabled) {
+      editButtons.current.get(pendingFocus.current)?.focus();
+      pendingFocus.current = null;
+    }
+  }, [disabled, editing]);
   async function run(action: string, values: Record<string, unknown>, success?: () => void) {
+    if (busy || !editor.startSaving()) return;
     setBusy(true);
     setError('');
     try {
       await act(action, values);
+      editor.saving(false);
       success?.();
     } catch (e: any) {
       setError(e.message);
       await reload().catch(() => {});
     } finally {
       setBusy(false);
+      editor.saving(false);
     }
   }
+  function renderRows(items: TodoRow[]) {
+    return (
+      <ul className="todo-items">
+        {items.map((row) => {
+          const isEditing =
+            !compact && editor.active === `todo:${row.id}` && editing?.old.id === row.id;
+          return (
+            <li key={row.id} className={row.completed ? 'is-complete' : ''}>
+              <div className="todo-item-main">
+                <label className="todo-check">
+                  <input
+                    type="checkbox"
+                    checked={row.completed}
+                    disabled={disabled}
+                    aria-label={(row.completed ? 'Reopen ' : 'Complete ') + row.name}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      void run(
+                        'todo.complete',
+                        { id: row.id, revision: row.revision, completed: checked },
+                        () => {
+                          // Only rebase our own acknowledged checkbox change, never another device's revision.
+                          if (isEditing && editing && editing.old.revision === row.revision)
+                            setEditing({
+                              ...editing,
+                              old: {
+                                ...editing.old,
+                                completed: checked,
+                                revision: row.revision + 1,
+                              },
+                            });
+                          if (checked && isEditing) setCompletedOpen(true);
+                        },
+                      );
+                    }}
+                  />
+                  <span>{row.name}</span>
+                </label>
+                {row.dueDate && <small>Due {formatDate(row.dueDate)}</small>}
+              </div>
+              {!compact && (
+                <div className="workspace-row-actions">
+                  <button
+                    type="button"
+                    className="icon-button quick-edit-trigger"
+                    ref={(node) => {
+                      if (node) editButtons.current.set(row.id, node);
+                      else editButtons.current.delete(row.id);
+                    }}
+                    disabled={disabled}
+                    aria-label={'Edit to-do ' + row.name}
+                    aria-expanded={isEditing}
+                    onClick={() => {
+                      if (isEditing) finish();
+                      else if (editor.begin(`todo:${row.id}`)) {
+                        setError('');
+                        setEditing({ old: row, name: row.name, dueDate: row.dueDate ?? '' });
+                      }
+                    }}
+                  >
+                    <Pencil size={17} />
+                  </button>
+                  <RowMenu
+                    name={row.name}
+                    disabled={disabled}
+                    actions={[
+                      {
+                        label: 'Convert to Task',
+                        run: () => {
+                          if (editor.leave()) {
+                            setEditing(null);
+                            setConverting(row);
+                          }
+                        },
+                      },
+                      {
+                        label: 'Move up',
+                        disabled: rows[0]?.id === row.id,
+                        run: () => {
+                          if (editor.leave()) {
+                            setEditing(null);
+                            void run('todo.move', {
+                              id: row.id,
+                              revision: row.revision,
+                              delta: -1,
+                            });
+                          }
+                        },
+                      },
+                      {
+                        label: 'Move down',
+                        disabled: rows.at(-1)?.id === row.id,
+                        run: () => {
+                          if (editor.leave()) {
+                            setEditing(null);
+                            void run('todo.move', { id: row.id, revision: row.revision, delta: 1 });
+                          }
+                        },
+                      },
+                      {
+                        label: 'Delete to-do',
+                        destructive: true,
+                        run: () => {
+                          if (confirm(`Delete to-do “${row.name}”?`))
+                            void run('todo.delete', { id: row.id, revision: row.revision }, () => {
+                              if (isEditing) finish();
+                            });
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+              )}
+              {isEditing && editing && (
+                <form
+                  className="todo-edit quick-editor"
+                  aria-label={'Quick edit to-do ' + row.name}
+                  autoComplete="off"
+                  onKeyDown={(e) => cancelQuickEditKey(e, disabled, finish)}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!disabled && editing.name.trim())
+                      void run(
+                        'todo.save',
+                        {
+                          id: row.id,
+                          revision: editing.old.revision,
+                          todo: { name: editing.name.trim(), dueDate: editing.dueDate || null },
+                        },
+                        finish,
+                      );
+                  }}
+                >
+                  <label className="field">
+                    To-do title
+                    <input
+                      autoFocus
+                      required
+                      maxLength={500}
+                      value={editing.name}
+                      disabled={disabled}
+                      onChange={(e) => {
+                        editor.changed();
+                        setEditing({ ...editing, name: e.target.value });
+                      }}
+                    />
+                  </label>
+                  <label className="field">
+                    Due date (optional)
+                    <DateTimeInput
+                      type="date"
+                      value={editing.dueDate}
+                      disabled={disabled}
+                      onChange={(e) => {
+                        editor.changed();
+                        setEditing({ ...editing, dueDate: e.target.value });
+                      }}
+                    />
+                  </label>
+                  <div className="quick-editor-actions">
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={disabled}
+                      onClick={finish}
+                    >
+                      Cancel
+                    </button>
+                    <button className="button primary" disabled={disabled || !editing.name.trim()}>
+                      Save
+                    </button>
+                  </div>
+                </form>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  const controls = (count: number, size: number, set: (n: number) => void, label: string) => (
+    <div className="workspace-list-controls">
+      {count > size && (
+        <button
+          type="button"
+          className="text-button"
+          disabled={disabled}
+          onClick={() => set(size + listPageSize)}
+        >
+          Show more {label}
+        </button>
+      )}
+      {size > listPageSize && (
+        <button
+          type="button"
+          className="text-button"
+          disabled={disabled}
+          onClick={() => {
+            if (editor.leave()) {
+              setEditing(null);
+              set(listPageSize);
+            }
+          }}
+        >
+          Show less {label}
+        </button>
+      )}
+    </div>
+  );
   return (
     <div className={'todo-list' + (compact ? ' todo-preview' : '')}>
       <form
@@ -42,7 +281,7 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
         autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
-          if (busy || !name.trim()) return;
+          if (disabled || !name.trim()) return;
           const todo = { name: name.trim(), dueDate: dueDate || null },
             key = JSON.stringify(todo);
           if (request.current?.key !== key) request.current = { key, id: todoRequestId() };
@@ -61,10 +300,10 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
             required
             maxLength={500}
             value={name}
-            disabled={busy}
+            disabled={disabled}
             onChange={(e) => setName(e.target.value)}
           />
-          <button className="button secondary" disabled={busy || !name.trim()}>
+          <button className="button secondary" disabled={disabled || !name.trim()}>
             Add
           </button>
         </div>
@@ -76,7 +315,7 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
               <DateTimeInput
                 type="date"
                 value={dueDate}
-                disabled={busy}
+                disabled={disabled}
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </label>
@@ -86,157 +325,54 @@ export function TodoList({ compact = false }: { compact?: boolean }) {
       {error && (
         <p className="error" role="alert">
           {error}
+          {editing &&
+            ' Your unsaved input is retained. For a conflict, cancel and reopen to load the latest record.'}
         </p>
       )}
-      <p className="muted todo-count">
-        {pending.length} pending{!compact && ` · ${rows.length - pending.length} completed`}
-      </p>
-      {!visible.length && (
-        <p className="muted">
-          {rows.length ? 'All caught up.' : 'No to-dos yet. Add your first quick reminder.'}
+      {!workspace && (
+        <p className="muted todo-count">
+          {pending.length} pending{!compact && ` · ${completed.length} completed`}
         </p>
       )}
-      <ul className="todo-items">
-        {visible.map((row) => (
-          <li key={row.id} className={row.completed ? 'is-complete' : ''}>
-            {editing?.old.id === row.id ? (
-              <form
-                className="todo-edit"
-                autoComplete="off"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!busy)
-                    void run(
-                      'todo.save',
-                      {
-                        id: row.id,
-                        revision: editing.old.revision,
-                        todo: { name: editing.name, dueDate: editing.dueDate || null },
-                      },
-                      () => setEditing(null),
-                    );
-                }}
-              >
-                <label className="field">
-                  To-do text
-                  <input
-                    autoComplete="off"
-                    required
-                    maxLength={500}
-                    value={editing.name}
-                    disabled={busy}
-                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  />
-                </label>
-                <label className="field">
-                  Due date (optional)
-                  <DateTimeInput
-                    type="date"
-                    value={editing.dueDate}
-                    disabled={busy}
-                    onChange={(e) => setEditing({ ...editing, dueDate: e.target.value })}
-                  />
-                </label>
-                <div className="todo-actions">
-                  <button className="button primary" disabled={busy}>
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    className="button secondary"
-                    disabled={busy}
-                    onClick={() => setEditing(null)}
-                  >
-                    Cancel edit
-                  </button>
-                </div>
-              </form>
-            ) : (
+      {!pending.length && (
+        <p className="workspace-empty muted">
+          {rows.length ? 'All caught up.' : 'No to-dos yet. Add a quick reminder.'}
+        </p>
+      )}
+      {renderRows(pending.slice(0, compact ? 5 : limit))}
+      {!compact && (
+        <>
+          {controls(pending.length, limit, setLimit, 'to-dos')}
+          <details
+            className="workspace-completed"
+            open={completedOpen}
+            onToggle={(e) => setCompletedOpen(e.currentTarget.open)}
+          >
+            <summary
+              onClick={(e) => {
+                if (
+                  completedOpen &&
+                  editing &&
+                  completed.some((t) => t.id === editing.old.id) &&
+                  editor.active === `todo:${editing.old.id}`
+                ) {
+                  if (!editor.leave()) e.preventDefault();
+                  else setEditing(null);
+                }
+              }}
+            >
+              Completed ({completed.length})
+            </summary>
+            {completedOpen && (
               <>
-                <div className="todo-item-main">
-                  <label className="todo-check">
-                    <input
-                      type="checkbox"
-                      checked={row.completed}
-                      disabled={busy}
-                      onChange={(e) =>
-                        void run('todo.complete', {
-                          id: row.id,
-                          revision: row.revision,
-                          completed: e.target.checked,
-                        })
-                      }
-                    />
-                    <span>{row.name}</span>
-                  </label>
-                  {row.dueDate && <small>Due {formatDate(row.dueDate)}</small>}
-                </div>
-                {!compact && (
-                  <div className="todo-actions">
-                    <button
-                      type="button"
-                      className="text-button todo-convert"
-                      disabled={busy}
-                      onClick={() => setConverting(row)}
-                      aria-label={'Convert to Task ' + row.name}
-                    >
-                      Convert to Task
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      disabled={busy}
-                      aria-label={'Edit to-do ' + row.name}
-                      onClick={() => {
-                        setError('');
-                        setEditing({ old: row, name: row.name, dueDate: row.dueDate ?? '' });
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <div className="todo-order" role="group" aria-label={'Order ' + row.name}>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={'Move ' + row.name + ' up'}
-                        disabled={busy || rows[0]?.id === row.id}
-                        onClick={() =>
-                          void run('todo.move', { id: row.id, revision: row.revision, delta: -1 })
-                        }
-                      >
-                        <ArrowUp size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={'Move ' + row.name + ' down'}
-                        disabled={busy || rows.at(-1)?.id === row.id}
-                        onClick={() =>
-                          void run('todo.move', { id: row.id, revision: row.revision, delta: 1 })
-                        }
-                      >
-                        <ArrowDown size={16} />
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-button danger-text todo-delete"
-                      disabled={busy}
-                      aria-label={'Delete to-do ' + row.name}
-                      onClick={() => {
-                        if (confirm(`Delete to-do “${row.name}”?`))
-                          void run('todo.delete', { id: row.id, revision: row.revision });
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
+                {renderRows(completed.slice(0, completedLimit))}
+                {!completed.length && <p className="muted">No completed to-dos yet.</p>}
+                {controls(completed.length, completedLimit, setCompletedLimit, 'completed to-dos')}
               </>
             )}
-          </li>
-        ))}
-      </ul>
+          </details>
+        </>
+      )}
       {converting && <TodoConversion todo={converting} close={() => setConverting(null)} />}
       {compact && (
         <button

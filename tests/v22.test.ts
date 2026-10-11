@@ -437,7 +437,7 @@ test('To-do conversion is atomic, inherits links, preserves completion default a
   };
   const html = render(React.createElement(TodoConversion, { todo: completed, close() {} }), data);
   assert.match(html, /<option selected="">Completed<\/option>/);
-  assert.match(render(React.createElement(TodoList), data), /Convert to Task/);
+  assert.match(render(React.createElement(TodoList), data), /Completed \(1\)/);
   const converted = await convertTodoToTask('owner', {
     todoId: completed.id,
     revision: completed.revision,
