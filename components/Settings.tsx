@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { Availability } from './Availability';
 import { SemesterBreaks } from './SemesterBreaks';
 import { NotificationSettings } from './Notifications';
 import { Download, Plus, ShieldCheck } from 'lucide-react';
@@ -80,7 +81,7 @@ export function Settings() {
               </small>
             </label>
             <label className="field">
-              Daily study capacity (hours)
+              Daily study target (hours)
               <input
                 autoComplete="off"
                 type="number"
@@ -111,6 +112,7 @@ export function Settings() {
           </button>
         </form>
       </Section>
+      <Availability />
       <NotificationSettings />
       <details className="more-fields">
         <summary>Semesters & data maintenance</summary>

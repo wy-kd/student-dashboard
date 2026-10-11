@@ -4014,3 +4014,38 @@ td:first-child {
     min-height: clamp(14rem, 34dvh, 20rem);
   }
 }
+
+/* V2.3 availability uses the existing form, theme and density conventions. */
+.availability-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.availability-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 16px;
+}
+.availability-day {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-block: 12px;
+}
+.availability-window {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 12px;
+}
+.availability-window .field {
+  flex: 1;
+  min-width: 100px;
+}
+.availability-day .button,
+.availability-day .text-button {
+  min-height: 44px;
+}
