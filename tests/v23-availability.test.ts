@@ -11,7 +11,7 @@ import {
   freeOn,
 } from '../lib/planning-availability';
 import { instant, intervalMinutes } from '../lib/planning-time';
-import { availabilitySchema } from '../lib/planning-model';
+import { availabilitySchema, defaultPlanningPreferences } from '../lib/planning-model';
 import { defaults } from '../lib/model';
 const dir = mkdtempSync(join(tmpdir(), 'student-v23-availability-'));
 process.env.DATABASE_URL = 'file:' + join(dir, 'test.db');
@@ -127,6 +127,54 @@ test('Localised date saves survive reopening, preserve other settings and affect
     availableOn(await snapshot(), result.date).reduce((n, x) => n + intervalMinutes(x), 0),
     360,
   );
+});
+test('Section saves patch only chosen weekdays or preferences and protect cross-device revisions', async () => {
+  const { saveAvailabilitySection, saveAvailabilityException } = await import(
+    '../lib/planning-actions'
+  );
+  const before = await planningSnapshot();
+  const exception = await saveAvailabilityException('owner', {
+    revision: before.preference.revision,
+    date: '2026-10-14',
+    windows: [],
+  });
+  let result = await saveAvailabilitySection('owner', {
+    section: 'weekly',
+    revision: exception.revision,
+    days: [
+      { day: 2, windows: [{ startTime: '10:00', endTime: '12:00' }] },
+      { day: 3, windows: [{ startTime: '10:00', endTime: '12:00' }] },
+    ],
+  });
+  const p = await planningSnapshot();
+  assert.deepEqual(
+    p.windows.filter((x) => x.day === 1),
+    before.windows,
+  );
+  assert.equal(p.exceptions[0].date, '2026-10-14');
+  assert.equal(p.exceptions[0].windows.length, 0);
+  await assert.rejects(
+    saveAvailabilitySection('owner', {
+      section: 'preferences',
+      revision: exception.revision,
+      preferences: defaultPlanningPreferences,
+    }),
+    /another device/,
+  );
+  result = await saveAvailabilitySection('owner', {
+    section: 'preferences',
+    revision: result.revision,
+    preferences: { ...defaultPlanningPreferences, preferredMinutes: 60 },
+  });
+  const after = await planningSnapshot();
+  assert.deepEqual(after.windows, p.windows);
+  assert.deepEqual(after.exceptions, p.exceptions);
+  assert.equal(after.preference.preferredMinutes, 60);
+  await saveAvailabilitySection('owner', {
+    section: 'preferences',
+    revision: result.revision,
+    preferences: defaultPlanningPreferences,
+  });
 });
 test('Existing commitments exclude occupied intervals once; deadlines/informational dates never block; breaks suppress classes', async () => {
   const sem = await saveRow('semester', {

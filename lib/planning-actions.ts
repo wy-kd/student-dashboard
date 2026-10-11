@@ -3,7 +3,11 @@ import { db } from './db';
 import { AppError, snapshot, validateRelations } from './service';
 import { generateSchedule, workItems } from './planning-engine';
 import { planningFingerprint, approveSchedule, undoSchedule } from './planning-approval';
-import { availabilitySchema, defaultPlanningPreferences } from './planning-model';
+import {
+  availabilitySchema,
+  defaultPlanningPreferences,
+  preferencesSchema,
+} from './planning-model';
 import { civilRange, instant } from './planning-time';
 import { suggestAdjustment } from './planning-adjustments';
 const revisionSchema = z.number().int().nonnegative();
@@ -87,6 +91,78 @@ export async function saveAvailabilityException(userId: string, input: unknown) 
       update: { revision: { increment: 1 } },
     });
     return { revision: preference.revision, date: value.date, windows: value.windows };
+  });
+}
+export async function saveAvailabilitySection(userId: string, input: unknown) {
+  const value = z
+    .discriminatedUnion('section', [
+      z
+        .object({
+          section: z.literal('weekly'),
+          revision: revisionSchema,
+          days: z
+            .array(
+              z
+                .object({
+                  day: z.number().int().min(0).max(6),
+                  windows: z
+                    .array(z.object({ startTime: z.string(), endTime: z.string() }).strict())
+                    .max(20),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(7),
+        })
+        .strict(),
+      z
+        .object({
+          section: z.literal('preferences'),
+          revision: revisionSchema,
+          preferences: preferencesSchema,
+        })
+        .strict(),
+    ])
+    .parse(input);
+  return db.$transaction(async (tx) => {
+    const old = await tx.schedulingPreference.findUnique({ where: { userId } });
+    if ((old?.revision ?? 0) !== value.revision)
+      throw new AppError(
+        'Availability changed on another device. Reload the saved settings before retrying; your draft has been kept.',
+        409,
+      );
+    if (value.section === 'weekly') {
+      if (new Set(value.days.map((x) => x.day)).size !== value.days.length)
+        throw new AppError('Choose each day only once.');
+      availabilitySchema.parse({
+        revision: value.revision,
+        preferences: defaultPlanningPreferences,
+        windows: value.days.flatMap((d) => d.windows.map((w) => ({ day: d.day, ...w }))),
+        exceptions: [],
+      });
+      const otherCount = await tx.availabilityWindow.count({
+        where: { userId, day: { notIn: value.days.map((x) => x.day) } },
+      });
+      if (otherCount + value.days.reduce((n, x) => n + x.windows.length, 0) > 100)
+        throw new AppError('Up to 100 weekly periods can be saved. Remove an old period first.');
+      for (const day of value.days) {
+        await tx.availabilityWindow.deleteMany({ where: { userId, day: day.day } });
+        for (const w of day.windows)
+          await tx.availabilityWindow.create({ data: { userId, day: day.day, ...w } });
+      }
+    }
+    return tx.schedulingPreference.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...(value.section === 'preferences' ? value.preferences : defaultPlanningPreferences),
+        revision: 1,
+      },
+      update: {
+        ...(value.section === 'preferences' ? value.preferences : {}),
+        revision: { increment: 1 },
+      },
+    });
   });
 }
 export async function saveCommitment(userId: string, input: unknown) {
@@ -194,6 +270,7 @@ export async function planningAction(userId: string, b: any) {
       ]),
     };
   }
+  if (b.action === 'availability.section') return saveAvailabilitySection(userId, b.data);
   if (b.action === 'availability.exception') return saveAvailabilityException(userId, b.data);
   if (b.action === 'availability.save') return saveAvailability(userId, b.data);
   if (b.action === 'commitment.save') return saveCommitment(userId, b.data);

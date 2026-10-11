@@ -45,9 +45,10 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.tasks-workspace-grid\{[^}]*align-items:stretch/);
   assert.match(css, /min-height:clamp\(26rem,52dvh,34rem\)/);
   assert.match(css, /min-height:clamp\(14rem,34dvh,20rem\)/);
+  assert.match(css, /\.availability-sections\{[^}]*container:availability\/inline-size/);
   assert.match(
     css,
-    /\.availability-days\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,310px\),1fr\)\)/,
+    /\.availability-week-row\{[^}]*grid-template-columns:100px minmax\(0,1fr\) auto auto/,
   );
   assert.match(css, /\.planning-preview-list\{[^}]*display:grid/);
   assert.match(css, /\.planned-work-actions\{[^}]*flex-wrap:wrap/);

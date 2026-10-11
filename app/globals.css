@@ -4022,11 +4022,6 @@ td:first-child {
   margin: 0;
   min-width: 0;
 }
-.availability-days {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
-  gap: 16px;
-}
 .availability-day {
   min-width: 0;
   padding: 16px;
@@ -4152,4 +4147,60 @@ td:first-child {
 .planned-work-editor textarea {
   min-width: 0;
   max-width: 100%;
+}
+
+/* V2.3.1: one focused editor, with summaries using the available content width. */
+.availability-sections {
+  display: grid;
+  gap: 24px;
+  container: availability / inline-size;
+}
+.availability-sections > section,
+.availability-sections > details {
+  min-width: 0;
+}
+.availability-week {
+  display: grid;
+}
+.availability-week-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.availability-week-row > span {
+  overflow-wrap: anywhere;
+}
+.availability-sections button {
+  min-height: 44px;
+}
+.availability-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+.availability-exceptions form {
+  max-width: 42rem;
+}
+.availability-refresh {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+@container availability (max-width: 540px) {
+  .availability-week-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .availability-week-row > strong {
+    grid-column: 1;
+  }
+  .availability-week-row > span {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .availability-week-row > button {
+    grid-column: 2;
+  }
 }

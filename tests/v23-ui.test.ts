@@ -138,6 +138,18 @@ globalThis.fetch = async (_url: any, init: any) => {
   lastPayload = payload;
   if (fail)
     return new Response(JSON.stringify({ error: 'Simulated stale availability' }), { status: 409 });
+  if (action === 'availability.section') {
+    writes++;
+    data.planning!.preference.revision++;
+    if (payload.section === 'weekly')
+      for (const day of payload.days)
+        data.planning!.windows = [
+          ...data.planning!.windows.filter((x) => x.day !== day.day),
+          ...day.windows.map((w: any) => ({ day: day.day, ...w })),
+        ];
+    else Object.assign(data.planning!.preference, payload.preferences);
+    return new Response(JSON.stringify({ result: data.planning!.preference }));
+  }
   if (action === 'availability.exception') {
     writes++;
     data.planning!.preference.revision++;
@@ -235,23 +247,32 @@ globalThis.fetch = async (_url: any, init: any) => {
 };
 test('Availability editor copies days, edits multiple periods/exceptions, preserves failed drafts and resets without saving', async () => {
   await render(React.createElement(Availability));
-  assert.match(document.body.textContent!, /Daily target: 3h/);
-  const monday = document.querySelector('.availability-day')!;
+  assert.match(document.body.textContent!, /daily study target \(3h\)/);
+  assert.equal(document.querySelectorAll('.availability-week-row').length, 7);
+  assert.equal(
+    document.querySelectorAll('[aria-label="Weekly availability"] input[type=time]').length,
+    0,
+    'weekly forms stay hidden until a day is edited',
+  );
+  const mondayRow = document.querySelector('.availability-week-row')!;
+  await click(mondayRow.querySelector('button')!);
+  const monday = document.querySelector('[aria-label="Edit Monday"]')!;
   await click(button('Add period', monday));
   await input(monday.querySelectorAll('input')[0], '10:00');
   await input(monday.querySelectorAll('input')[1], '13:00');
-  await select(monday.querySelector('select')!, '2');
-  await submit(document.querySelector('form')!);
+  await click(monday.querySelectorAll('input[type=checkbox]')[1] as HTMLElement);
+  await submit(monday as HTMLFormElement);
   assert.equal(writes, 1);
   assert.deepEqual(
-    lastPayload.windows.map((w: any) => w.day),
+    lastPayload.days.map((w: any) => w.day),
     [1, 2],
   );
-  await click(button('Mark unavailable', monday));
-  assert.equal(monday.querySelectorAll('input').length, 0);
-  await click(button('Cancel / reset unsaved changes'));
-  assert.equal(monday.querySelectorAll('input').length, 2);
+  await click(mondayRow.querySelectorAll('button')[1]);
+  assert.equal(document.querySelectorAll('[aria-label="Edit Monday"] input[type=time]').length, 0);
+  await click(button('Cancel weekly edit'));
   assert.equal(writes, 1);
+  await click(mondayRow.querySelector('button')!);
+  const weeklyDraft = document.querySelector('[aria-label="Edit Monday"]')!;
   const scope = document.querySelector('[aria-label="Date-specific availability"]')!;
   const exception = scope.querySelector('input[type=date]') as HTMLInputElement;
   await input(exception, '2026-10-14');
@@ -264,11 +285,11 @@ test('Availability editor copies days, edits multiple periods/exceptions, preser
   assert.equal(writes, 1, 'failed save retains draft without mutation');
   fail = false;
   // Leave an unrelated weekly change unsaved; a date save must not submit it.
-  await input(monday.querySelectorAll('input')[0], '08:00');
+  await input(weeklyDraft.querySelectorAll('input')[0], '08:00');
   await submit(scope.querySelector('form')!);
   assert.equal(writes, 2);
   assert.equal(data.planning!.windows[0].startTime, '10:00');
-  assert.equal((monday.querySelector('input') as HTMLInputElement).value, '08:00');
+  assert.equal((weeklyDraft.querySelector('input') as HTMLInputElement).value, '08:00');
   assert.deepEqual(lastPayload.windows, [
     { startTime: '09:00', endTime: '12:00' },
     { startTime: '14:00', endTime: '17:00' },
