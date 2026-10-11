@@ -189,6 +189,7 @@ export function Inbox() {
                   <label className="field">
                     Name
                     <input
+                      autoComplete="off"
                       required
                       maxLength={500}
                       value={draft.name}
@@ -198,6 +199,7 @@ export function Inbox() {
                   <label className="field">
                     Due date (optional)
                     <DateTimeInput
+                      autoComplete="off"
                       type={kind === 'todo' ? 'date' : 'datetime-local'}
                       value={kind === 'todo' ? (draft.dueDate ?? '') : (draft.dueAt ?? '')}
                       onChange={(e) =>
@@ -287,6 +289,7 @@ export function Inbox() {
                       <label className="field">
                         Notes
                         <textarea
+                          autoComplete="off"
                           value={draft.notes ?? ''}
                           maxLength={20000}
                           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
@@ -368,6 +371,7 @@ export function Inbox() {
                 <label className="field">
                   Review after
                   <DateTimeInput
+                    autoComplete="off"
                     type="datetime-local"
                     required
                     disabled={disabled}
@@ -499,6 +503,7 @@ function InboxReviewPreferences() {
               <label className="field">
                 Review time
                 <input
+                  autoComplete="off"
                   type="time"
                   required
                   value={draft.time}

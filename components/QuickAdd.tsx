@@ -212,6 +212,7 @@ function QuickTodo({ onState }: { onState: (state: { dirty: boolean; busy: boole
         <label className="field">
           To-do
           <input
+            autoComplete="off"
             required
             maxLength={500}
             value={name}

@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current release: **V2.3 — Basic Time Management & Scheduling**. See the [backup-first Acer update, recovery and device guide](docs/V2.3-GUIDE.md).
+Current release: **V2.3.1 — Scheduling UX, Quick Create, Inbox & Sidebar Fixes**. See the [backup-first Acer update, recovery and acceptance guide](docs/V2.3.1-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -438,7 +438,7 @@ Use **Settings → Add demo data**, or run `npm run db:seed`. Demo dates are rel
 
 For an installation using automatic startup, use this order. Run each command separately; **stop if any step fails**.
 
-For the V2.2.1 → V2.3 update, follow the [V2.3 guide](docs/V2.3-GUIDE.md) first. It includes timestamped full-data/environment/JSON backups, count/hash verification, lifecycle validation and paired source/database rollback for the new additive migration.
+For the V2.3 → V2.3.1 update, follow the [V2.3.1 guide](docs/V2.3.1-GUIDE.md) first. It includes timestamped full-data/environment/JSON backups, count/hash verification, lifecycle validation and paired source/database rollback for the new additive migration.
 
 1. While the app is still running, download a JSON backup through **Settings → Backups & data export**, then copy it somewhere separate from the laptop if possible.
 2. In your repository's Command Prompt, disable automatic startup and stop safely:
@@ -533,7 +533,6 @@ V2 adds an editable responsive Dashboard, Comfortable/Compact density, a persist
 
 The scheduler lives inside Next.js and recovers persisted reminders after restart; see [notification architecture and limitations](docs/V2-GUIDE.md#reminder-scheduling-and-retention). No second process, cloud database, public hosting or Tailscale/Task Scheduler configuration change is needed. Portable backups now use version 2 and include V2 academic/productivity state; version 1 imports still work. Passwords, sessions and push secrets stay out of portable JSON exports.
 
-
 ## V2.1 usability polish
 
 V2.1 adds a saved collapsible navigation rail, a responsive timer dock and prompt cross-device timer updates. V2.1.1 removes the application fullscreen control, rebuilds the timer and recurring-task layouts and guards against stale production CSS. Recurring series have a separate editor and confirmed deletion that preserves completed history. Automatic Plan My Day/Plan Next Week proposals are removed; manual study sessions, Today and Weekly Review remain.
@@ -562,7 +561,6 @@ Tasks now includes a separate lightweight To-do list, with optional due dates, c
 
 The only schema change is additive migration `202609080001_todos`, creating `TodoItem` and its index. Existing startup/install migration behaviour applies it; no existing table or academic record is replaced. JSON backup/restore includes To-dos and still accepts older backups. Authentication, timer sync, reminders, Web Push, Windows startup and Tailscale are unchanged. No dependency or Spotify integration is added.
 
-
 ## V2.1.4 timer, sidebar and Dashboard cleanup
 
 See the [V2.1.4 backup-first Acer update guide](docs/V2.1.4-GUIDE.md) for exact commands and device checks. No database migration or dependency is added.
@@ -572,7 +570,6 @@ Cancel timer and its confirmations are removed from all active timer views. Paus
 Sidebar scrollbars are hidden with Firefox/Chromium/WebKit CSS while native scrolling and keyboard navigation remain enabled. Dashboard begins with its heading; Semester progress now shows `Semester name | DD/MM/YYYY - Week N/M` as one bold summary. Semester Break/resumption, before-start and teaching-complete states reuse the existing calculations. The shared Analytics summary uses the same format.
 
 SQLite, authentication, reminders, Web Push, To-dos, recurring tasks, backups, Windows startup and Tailscale are unchanged. Spotify and other new features are outside this release.
-
 
 ## V2.1.4.1 semester progress and floating timer polish
 
@@ -621,3 +618,11 @@ Tasks panels now stretch equally in wide layouts, retain shared responsive minim
 Preview edits, selective approval, guarded retries and safe undo never silently replace confirmed plans or mark work complete. Confirmed work appears in Today/Calendar/Timetable and links to existing Tasks/assessments/timer review. Intended and actual hours remain separate; recorded changes produce reviewable alternatives and neutral past-session prompts. No second timer or calendar store is introduced.
 
 One create-only migration adds seven scheduling tables; V3 JSON backs them up and V1/V2 restore remains supported. No dependency, authentication, reminder, Web Push, recurring Task, PWA, Windows or Tailscale infrastructure change is made. Use the [V2.3 usage, backup-first Acer update and recovery guide](docs/V2.3-GUIDE.md) and [staged architecture/validation record](docs/V2.3-ARCHITECTURE.md). Spotify and external integrations remain outside this release.
+
+## V2.3.1 scheduling and workflow corrections
+
+Availability now saves beside the relevant weekday/date/preference editor. Date changes clearly distinguish replacement hours, all-day unavailability and returning to the weekly rule; cross-device failures retain drafts. The shared planning flow chooses a period, reviews date-grouped suggestions and explicitly confirms selected sessions. Review causes are grouped instead of repeating long warnings. The existing scheduling engine, approval safety and actual-time recording remain intact.
+
+Quick Create keeps advanced fields under More options. Quick Add separates capture from direct academic records and To-dos. Inbox retains processed/archived captures, supports guarded Task/To-do conversion and snooze, exposes an actionable count distinct from notifications, and provides optional Daily/Weekly review reminders (Off by default). A shared layout plus tab-local native scroll restoration preserves sidebar navigation. Changed surfaces use content-width layouts, bounded dialog bodies and readable spacing.
+
+One additive Inbox migration preserves populated V2.3 records. V3 backups include its fields/table and older imports remain supported. No dependency, authentication, timer architecture, Windows startup, Task Scheduler, Tailscale or PWA infrastructure changes. See [V2.3.1 usage/update/recovery](docs/V2.3.1-GUIDE.md) and [stage validation/change record](docs/V2.3.1-CHANGES.md). Physical Acer/iPad/phone/reboot checks remain local. Spotify, hosting and external integrations remain outside this release.
