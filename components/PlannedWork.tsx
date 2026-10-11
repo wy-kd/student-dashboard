@@ -123,37 +123,40 @@ export function PlannedWorkRow({ block, compact = false }: { block: any; compact
           >
             Edit / reschedule
           </button>
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            onClick={() => change('block.lock', { locked: !block.locked })}
-          >
-            {block.locked ? 'Unlock session' : 'Keep fixed'}
-          </button>
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              if (
-                confirm(
-                  'Remove this planned allocation? Tasks and recorded study history will remain.',
+          <details className="planned-work-more">
+            <summary>More actions</summary>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => change('block.lock', { locked: !block.locked })}
+            >
+              {block.locked ? 'Unlock session' : 'Keep fixed'}
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  confirm(
+                    'Remove this planned allocation? Tasks and recorded study history will remain.',
+                  )
                 )
-              )
-                change('block.dismiss');
-            }}
-          >
-            Remove plan
-          </button>
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            onClick={() => setRecording(true)}
-          >
-            Record reviewed work
-          </button>
+                  change('block.dismiss');
+              }}
+            >
+              Remove plan
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy}
+              onClick={() => setRecording(true)}
+            >
+              Record reviewed work
+            </button>
+          </details>
         </div>
       )}
       {block.endAt - block.startAt > 240 * 60000 && block.state === 'planned' && (
@@ -313,22 +316,25 @@ export function PlannedWorkEditor({ id, close }: { id: string; close: () => void
                     onChange={(e) => setDraft({ ...draft, end: e.target.value })}
                   />
                 </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={draft.override}
-                    onChange={(e) => setDraft({ ...draft, override: e.target.checked })}
-                  />
-                  Explicit manual availability override
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={draft.locked}
-                    onChange={(e) => setDraft({ ...draft, locked: e.target.checked })}
-                  />
-                  Keep fixed after approval
-                </label>
+                <details className="more-fields full">
+                  <summary>Advanced session options</summary>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={draft.override}
+                      onChange={(e) => setDraft({ ...draft, override: e.target.checked })}
+                    />
+                    Explicit manual availability override
+                  </label>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={draft.locked}
+                      onChange={(e) => setDraft({ ...draft, locked: e.target.checked })}
+                    />
+                    Keep fixed after approval
+                  </label>
+                </details>
               </div>
             </fieldset>
           )}

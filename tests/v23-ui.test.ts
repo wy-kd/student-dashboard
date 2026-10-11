@@ -309,6 +309,34 @@ test('Availability editor copies days, edits multiple periods/exceptions, preser
   assert.deepEqual(data.planning!.exceptions, []);
 });
 
+test('Planning entry points choose correct civil periods and missing availability has a direct next step', async () => {
+  await render(null);
+  await render(React.createElement(SchedulePlanning));
+  for (const [label, startDate, endDate] of [
+    ['Plan my week', '2026-10-12', '2026-10-18'],
+    ['Plan tomorrow', '2026-10-13', '2026-10-13'],
+    ['Plan the rest of today', '2026-10-12', '2026-10-12'],
+  ]) {
+    await click(button(label));
+    assert.ok(document.querySelector('[aria-label="Planning readiness"]'));
+    assert.ok(!document.querySelector('[aria-label="Schedule preview"]'));
+    await click(button('Suggest study sessions'));
+    assert.equal(lastPayload.startDate, startDate);
+    assert.equal(lastPayload.endDate, endDate);
+    await click(button('Cancel proposal'));
+  }
+  const windows = data.planning!.windows;
+  data.planning!.windows = [];
+  await render(null);
+  await render(React.createElement(SchedulePlanning));
+  await click(button('Plan my week'));
+  assert.match(document.body.textContent!, /No study availability has been set up yet/);
+  assert.ok(!button('Suggest study sessions'));
+  await click(button('Set availability'));
+  assert.equal(lastNavigation, '/settings#availability');
+  data.planning!.windows = windows;
+  await render(null);
+});
 test('Scheduling preview edits and selective approval retain uncertain requests, while Cancel makes no changes', async () => {
   data.task = [
     {
@@ -332,24 +360,28 @@ test('Scheduling preview edits and selective approval retain uncertain requests,
   ];
   await render(React.createElement(SchedulePlanning));
   await click(button('Plan my week'));
+  await click(button('Suggest study sessions'));
   assert.ok(document.querySelector('[aria-label="Schedule preview"]'));
   assert.equal(approvalWrites, 0);
   await click(button('Cancel proposal'));
   assert.equal(approvalWrites, 0);
   assert.equal(data.planning!.blocks.length, 0);
   await click(button('Plan my week'));
+  await click(button('Suggest study sessions'));
   const cards = Array.from(document.querySelectorAll('.planning-suggestion'));
   assert.ok(cards.length > 1);
   for (const card of cards.slice(1))
     await click(card.querySelector('input[type=checkbox]') as HTMLElement);
   const first = cards[0];
+  await click(button('Edit session', first));
   await select(first.querySelector('select')!, 'task:alternative');
   const times = first.querySelectorAll('input[type=datetime-local]');
   await input(times[0] as HTMLInputElement, '2026-10-12T14:00');
   await input(times[1] as HTMLInputElement, '2026-10-12T15:00');
   await click(first.querySelectorAll('input[type=checkbox]')[1] as HTMLElement);
   interruptApproval = true;
-  await click(button('Accept selected changes'));
+  await click(button('Review selected sessions'));
+  await click(button('Accept selected sessions'));
   assert.equal(approvalWrites, 1);
   assert.match(document.body.textContent!, /approval response was interrupted/);
   assert.ok(button('Retry same approval'));
@@ -462,7 +494,8 @@ test('Past-plan review is neutral; Keep and Cancel do not write and an accepted 
   assert.equal(approvalWrites, before);
   assert.equal(block.startAt, instant('2026-10-12T08:00', 'Australia/Brisbane'));
   await click(button('Review alternative times'));
-  await click(button('Accept selected changes'));
+  await click(button('Review selected sessions'));
+  await click(button('Accept selected sessions'));
   assert.equal(approvalWrites, before + 1);
   assert.equal(data.planning!.blocks.length, 1);
   assert.equal(block.startAt, instant('2026-10-12T14:00', 'Australia/Brisbane'));

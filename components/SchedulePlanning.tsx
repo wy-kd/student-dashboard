@@ -7,12 +7,14 @@ import { addDays } from '@/lib/calculations';
 import { civilAt, civilRange, instant, minute } from '@/lib/planning-time';
 import {
   workItems,
+  generateSchedule,
   type ScheduleProposal,
   type SuggestedBlock,
   type WorkItem,
 } from '@/lib/planning-engine';
 import { requestPlanning } from '@/lib/planning-client';
-import { formatTimestamp } from '@/lib/format';
+import { reviewGroups, proposalTotals } from '@/lib/planning-presentation';
+import { formatDate, formatTime, formatTimestamp } from '@/lib/format';
 import { scheduleIssues } from '@/lib/planning-disruptions';
 import { PlannedWorkReview, PlannedWorkEditor } from './PlannedWork';
 type Preview = ScheduleProposal & { fingerprint: string };
@@ -29,6 +31,9 @@ export function SchedulePlanning() {
     today = now.slice(0, 10),
     zone = d.setting.timezone;
   const [range, setRange] = useState({ startDate: today, endDate: addDays(today, 6) }),
+    [chosen, setChosen] = useState(false),
+    [confirming, setConfirming] = useState(false),
+    [expanded, setExpanded] = useState<string | null>(null),
     [preview, setPreview] = useState<Preview | null>(null),
     [rows, setRows] = useState<Draft[]>([]),
     [busy, setBusy] = useState(false),
@@ -41,11 +46,41 @@ export function SchedulePlanning() {
     [recordBlock, setRecordBlock] = useState<any>(null),
     [editBlock, setEditBlock] = useState<string | null>(null);
   const pending = useRef<any>(null),
-    allWork = workItems(scoped, Date.now()).items,
+    allWork = workItems(scoped, instant(now, zone)).items,
     scopedIds = new Set((scoped.planning?.blocks ?? []).map((b) => b.id)),
     issues = scheduleIssues(d, instant(now, zone)).filter(
       (issue) => scopedIds.has(issue.block.id) && !kept.includes(issue.key),
     );
+  const readiness = (() => {
+    try {
+      return generateSchedule(
+        d,
+        instant(now, zone),
+        range.startDate,
+        range.endDate,
+        workItems(d, instant(now, zone)).items.map((w) => w.key),
+      );
+    } catch {
+      return null;
+    }
+  })();
+  const configured = !!(
+    d.planning?.windows.length || d.planning?.exceptions.some((x) => x.windows.length)
+  );
+  const totals = proposalTotals(rows, (start, end) => {
+    const x = civilRange(start, end, zone);
+    return (x.end - x.start) / minute;
+  });
+  function choose(startDate: string, endDate: string) {
+    if (busy || uncertain) return;
+    setRange({ startDate, endDate });
+    setChosen(true);
+    setPreview(null);
+    setRows([]);
+    setConfirming(false);
+    setError('');
+    setMessage('');
+  }
   async function generate(
     startDate = range.startDate,
     endDate = range.endDate,
@@ -67,6 +102,9 @@ export function SchedulePlanning() {
               semesterId: scoped.setting.activeSemesterId,
             },
       );
+      setChosen(true);
+      setConfirming(false);
+      setExpanded(null);
       setAdjustmentId(moveId);
       setRange({ startDate, endDate });
       setPreview(p);
@@ -180,198 +218,290 @@ export function SchedulePlanning() {
     >
       <div className="planning-workspace">
         {issues.length > 0 && (
-          <div className="planning-review" aria-label="Recorded schedule changes">
-            <h3>Plans needing review</h3>
+          <details className="planning-review" aria-label="Recorded schedule changes">
+            <summary>Plans needing review ({issues.length})</summary>
             <p className="muted">
               These prompts reflect recorded changes. No plan has been moved, marked failed or
               completed automatically.
             </p>
-            {issues.slice(0, 50).map((issue) => (
-              <div className="planning-suggestion" key={issue.key}>
-                <strong>{issue.block.name}</strong>
-                <p className="muted">
-                  {formatTimestamp(issue.block.startAt, zone)} –{' '}
-                  {formatTimestamp(issue.block.endAt, zone)}
-                </p>
-                {issue.reasons.map((reason, i) => (
-                  <p key={i}>{reason}</p>
-                ))}
-                {issue.active && (
-                  <p>Use End and the existing timer review before changing this plan.</p>
-                )}
-                {issue.block.locked && (
-                  <p>
-                    This session is fixed. Unlock it explicitly in confirmed planned work to request
-                    a move.
+            {issues.map((issue) => (
+              <details className="planning-issue" key={issue.key}>
+                <summary>
+                  {issue.block.name} · {formatTimestamp(issue.block.startAt, zone)}
+                </summary>
+                <div className="planning-suggestion">
+                  <strong>{issue.block.name}</strong>
+                  <p className="muted">
+                    {formatTimestamp(issue.block.startAt, zone)} –{' '}
+                    {formatTimestamp(issue.block.endAt, zone)}
                   </p>
-                )}
-                <div className="inline">
-                  <button
-                    type="button"
-                    className="button secondary"
-                    disabled={busy || uncertain || issue.active}
-                    onClick={() => setRecordBlock(issue.block)}
-                  >
-                    Record what I completed
-                  </button>
-                  <button
-                    type="button"
-                    className="button secondary"
-                    disabled={busy || uncertain || !issue.canSuggest}
-                    onClick={() => generate(today, addDays(today, 6), issue.block.id)}
-                  >
-                    Review alternative times
-                  </button>
-                  {!issue.canSuggest && !issue.block.locked && !issue.active && (
+                  {issue.reasons.map((reason, i) => (
+                    <p key={i}>{reason}</p>
+                  ))}
+                  {issue.active && (
+                    <p>Use End and the existing timer review before changing this plan.</p>
+                  )}
+                  {issue.block.locked && (
+                    <p>
+                      This session is fixed. Unlock it explicitly in confirmed planned work to
+                      request a move.
+                    </p>
+                  )}
+                  <div className="inline">
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={busy || uncertain || issue.active}
+                      onClick={() => setRecordBlock(issue.block)}
+                    >
+                      Record what I completed
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={busy || uncertain || !issue.canSuggest}
+                      onClick={() => generate(today, addDays(today, 6), issue.block.id)}
+                    >
+                      Review alternative times
+                    </button>
+                    {!issue.canSuggest && !issue.block.locked && !issue.active && (
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={busy || uncertain}
+                        onClick={() => setEditBlock(issue.block.id)}
+                      >
+                        Review work association
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="text-button"
                       disabled={busy || uncertain}
-                      onClick={() => setEditBlock(issue.block.id)}
+                      onClick={() => setKept([...kept, issue.key])}
                     >
-                      Review work association
+                      Keep current plan
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy || uncertain}
-                    onClick={() => setKept([...kept, issue.key])}
-                  >
-                    Keep current plan
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy || uncertain || issue.active}
-                    onClick={() => dismiss(issue.block.id, issue.block.revision)}
-                  >
-                    Dismiss
-                  </button>
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={busy || uncertain || issue.active}
+                      onClick={() => dismiss(issue.block.id, issue.block.revision)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </details>
             ))}
-            {issues.length > 50 && (
-              <p>
-                {issues.length - 50} more plans need review. Review these, then reload to continue.
-              </p>
-            )}
-          </div>
+          </details>
         )}
-        <div className="inline">
-          <button
-            type="button"
-            className="button primary"
-            disabled={busy || uncertain}
-            onClick={() => generate(today, addDays(today, 6))}
-          >
-            Plan my week
-          </button>
-          <button
-            type="button"
-            className="button secondary"
-            disabled={busy || uncertain}
-            onClick={() => generate(addDays(today, 1), addDays(today, 1))}
-          >
-            Plan tomorrow
-          </button>
-          <button
-            type="button"
-            className="button secondary"
-            disabled={busy || uncertain}
-            onClick={() => generate(today, today)}
-          >
-            Plan remainder of today
-          </button>
-          <button
-            type="button"
-            className="text-button"
-            onClick={() => go('/settings#availability')}
-          >
-            Adjust availability
-          </button>
-        </div>
-        <details className="more-fields">
-          <summary>Planning period and work estimates</summary>
-          <div className="form-grid">
-            <label className="field">
-              From
-              <DateTimeInput
-                type="date"
-                min={today}
-                value={range.startDate}
+        {!preview && (
+          <>
+            <h3>1. Choose what to plan</h3>
+            <div className="inline">
+              <button
+                type="button"
+                className="button primary"
                 disabled={busy || uncertain}
-                onChange={(e) => setRange({ ...range, startDate: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              Through (up to 14 days)
-              <DateTimeInput
-                type="date"
-                min={range.startDate}
-                max={addDays(range.startDate || today, 13)}
-                value={range.endDate}
+                onClick={() => choose(today, addDays(today, 6))}
+              >
+                Plan my week
+              </button>
+              <button
+                type="button"
+                className="button secondary"
                 disabled={busy || uncertain}
-                onChange={(e) => setRange({ ...range, endDate: e.target.value })}
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            className="button secondary"
-            disabled={busy || uncertain}
-            onClick={() => generate()}
-          >
-            Plan selected period
-          </button>
-          <p className="muted">
-            Unestimated or partly completed work needs a user-entered remaining estimate. Planned
-            minutes are separate from actual time. Excluding work affects only the next proposal.
-          </p>
-          {allWork.map((work) => (
-            <div className="planning-work-item" key={work.key}>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={!excluded.includes(work.key)}
-                  disabled={busy || uncertain}
-                  onChange={(e) =>
-                    setExcluded(
-                      e.target.checked
-                        ? excluded.filter((k) => k !== work.key)
-                        : [...excluded, work.key],
-                    )
-                  }
-                />
-                Include {work.name}
-              </label>
-              <WorkEstimateEditor work={work} />
+                onClick={() => choose(addDays(today, 1), addDays(today, 1))}
+              >
+                Plan tomorrow
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={busy || uncertain}
+                onClick={() => choose(today, today)}
+              >
+                Plan the rest of today
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => go('/settings#availability')}
+              >
+                Adjust availability
+              </button>
             </div>
-          ))}
-        </details>
+            <p className="muted">
+              My week covers today plus six days. Tomorrow covers the next day. The rest of today
+              uses only time still ahead.
+            </p>
+            {chosen && (
+              <div className="planning-readiness" aria-label="Planning readiness">
+                <h4>
+                  {formatDate(range.startDate)}
+                  {range.endDate !== range.startDate ? ` – ${formatDate(range.endDate)}` : ''}
+                </h4>
+                {!configured ? (
+                  <>
+                    <p>No study availability has been set up yet.</p>
+                    <button
+                      type="button"
+                      className="button primary"
+                      onClick={() => go('/settings#availability')}
+                    >
+                      Set availability
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="planning-summary">
+                      <span>
+                        <strong>{((readiness?.capacityMinutes ?? 0) / 60).toFixed(1)}h</strong>{' '}
+                        known free capacity
+                      </span>
+                      <span>
+                        <strong>{readiness?.occupied.length ?? 0}</strong> commitments and
+                        reservations
+                      </span>
+                      <span>
+                        <strong>{((readiness?.confirmedMinutes ?? 0) / 60).toFixed(1)}h</strong>{' '}
+                        already planned
+                      </span>
+                      <span>
+                        <strong>{allWork.filter((w) => w.minutes === null).length}</strong> missing
+                        estimates
+                      </span>
+                    </div>
+                    <p className="muted">
+                      Availability and daily limits are included. Estimates and deadlines may limit
+                      what fits.
+                    </p>
+                    <button
+                      type="button"
+                      className="button primary"
+                      disabled={busy || !readiness}
+                      onClick={() => generate()}
+                    >
+                      {busy ? 'Preparing…' : 'Suggest study sessions'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            <details className="more-fields">
+              <summary>Custom dates and work estimates</summary>
+              <div className="form-grid">
+                <label className="field">
+                  From
+                  <DateTimeInput
+                    type="date"
+                    min={today}
+                    value={range.startDate}
+                    disabled={busy || uncertain}
+                    onChange={(e) => setRange({ ...range, startDate: e.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  Through (up to 14 days)
+                  <DateTimeInput
+                    type="date"
+                    min={range.startDate}
+                    max={addDays(range.startDate || today, 13)}
+                    value={range.endDate}
+                    disabled={busy || uncertain}
+                    onChange={(e) => setRange({ ...range, endDate: e.target.value })}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={busy || uncertain}
+                onClick={() => choose(range.startDate, range.endDate)}
+              >
+                Plan selected period
+              </button>
+              <p className="muted">
+                Unestimated or partly completed work needs a user-entered remaining estimate.
+                Planned minutes are separate from actual time. Excluding work affects only the next
+                proposal.
+              </p>
+              {allWork.map((work) => (
+                <div className="planning-work-item" key={work.key}>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={!excluded.includes(work.key)}
+                      disabled={busy || uncertain}
+                      onChange={(e) =>
+                        setExcluded(
+                          e.target.checked
+                            ? excluded.filter((k) => k !== work.key)
+                            : [...excluded, work.key],
+                        )
+                      }
+                    />
+                    Include {work.name}
+                  </label>
+                  <details className="more-fields">
+                    <summary>Set remaining time</summary>
+                    <WorkEstimateEditor work={work} />
+                  </details>
+                </div>
+              ))}
+            </details>
+          </>
+        )}
         {error && (
           <p className="notice" role="alert">
             {error}
           </p>
         )}
-        {message && <p role="status">{message}</p>}
+        {message && (
+          <div role="status">
+            <p>{message}</p>
+            <div className="inline">
+              <button type="button" className="button secondary" onClick={() => go('/today')}>
+                Open Today
+              </button>
+              <button type="button" className="button secondary" onClick={() => go('/calendar')}>
+                Open Calendar
+              </button>
+            </div>
+          </div>
+        )}
         {preview && (
           <div className="planning-preview" aria-label="Schedule preview">
-            <h3>Suggested plan · {preview.status}</h3>
-            <p>
-              {(preview.requiredMinutes / 60).toFixed(1)}h known work needing allocation ·{' '}
-              {(preview.capacityMinutes / 60).toFixed(1)}h known free capacity ·{' '}
-              {(preview.confirmedMinutes / 60).toFixed(1)}h already planned in this period
+            <h3>{confirming ? '3. Review and confirm' : '2. Review suggested schedule'}</h3>
+            <div className="planning-summary">
+              <span>
+                <strong>{rows.length}</strong> study sessions suggested
+              </span>
+              <span>
+                <strong>{(totals.minutes / 60).toFixed(1)}h</strong> selected
+              </span>
+              <span>
+                <strong>{preview.unscheduled.length + preview.conflicts.length}</strong> items need
+                attention
+              </span>
+            </div>
+            <p className="notice">
+              Nothing has been saved yet. {totals.count} sessions selected for approval.
             </p>
             <p className="muted">
-              Suggestions below are unconfirmed. Unknown estimates and deadline-specific shortfalls
-              are listed separately.
+              {(preview.requiredMinutes / 60).toFixed(1)}h known work ·{' '}
+              {(preview.capacityMinutes / 60).toFixed(1)}h free capacity ·{' '}
+              {(preview.confirmedMinutes / 60).toFixed(1)}h already reserved.
             </p>
-            {preview.warnings.map((w, i) => (
-              <p className="muted" key={i}>
-                {w}
-              </p>
-            ))}
+            {preview.warnings.length > 0 && (
+              <details className="more-fields">
+                <summary>Other planning information ({preview.warnings.length})</summary>
+                {preview.warnings.map((w, i) => (
+                  <p key={i}>{w}</p>
+                ))}
+              </details>
+            )}
             <details className="more-fields">
               <summary>
                 Existing commitments and confirmed sessions ({preview.occupied.length})
@@ -383,120 +513,137 @@ export function SchedulePlanning() {
                 </p>
               ))}
             </details>
-            {preview.conflicts.map((c, i) => (
-              <p className="notice" key={i}>
-                {c}
-              </p>
-            ))}
-            {preview.unscheduled.length > 0 && (
-              <div className="planning-unscheduled">
-                <h4>Work needing review</h4>
-                {preview.unscheduled.map((w) => (
-                  <p key={w.workKey}>
-                    <strong>{w.name}</strong>:{' '}
-                    {w.minutes == null
-                      ? 'duration unknown'
-                      : (w.minutes / 60).toFixed(1) + 'h unscheduled'}{' '}
-                    · {w.reason}
-                  </p>
-                ))}
-              </div>
-            )}
+            <ProposalAttention proposal={preview} go={go} />
             <fieldset className="availability-fieldset" disabled={busy || uncertain}>
               <div className="planning-preview-list">
-                {rows.map((row) => (
-                  <div className="planning-suggestion" key={row.id}>
-                    <div className="planning-suggestion-heading">
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={row.selected}
-                          onChange={(e) => edit(row.id, { selected: e.target.checked })}
-                        />
-                        {row.moveId ? 'Proposed move' : 'Unconfirmed suggestion'} · {row.name}
-                      </label>
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => setRows(rows.filter((r) => r.id !== row.id))}
-                      >
-                        Remove suggestion
-                      </button>
-                    </div>
-                    <p className="muted">{row.reason}</p>
-                    <div className="form-grid">
-                      <label className="field">
-                        Work
-                        <select
-                          value={row.workKey ?? ''}
-                          onChange={(e) => {
-                            const work = preview.items.find((w) => w.key === e.target.value);
-                            edit(row.id, {
-                              workKey: work?.key ?? null,
-                              name: work?.name ?? 'Reserved study time',
-                            });
-                          }}
-                        >
-                          <option value="">Reserve extra study time</option>
-                          {preview.items.map((w) => (
-                            <option value={w.key} key={w.key}>
-                              {w.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        Session title
-                        <input
-                          value={row.name}
-                          maxLength={500}
-                          required
-                          onChange={(e) => edit(row.id, { name: e.target.value })}
-                        />
-                      </label>
-                      <label className="field">
-                        Start
-                        <DateTimeInput
-                          type="datetime-local"
-                          required
-                          value={row.start}
-                          onChange={(e) => edit(row.id, { start: e.target.value })}
-                        />
-                      </label>
-                      <label className="field">
-                        End
-                        <DateTimeInput
-                          type="datetime-local"
-                          required
-                          value={row.end}
-                          onChange={(e) => edit(row.id, { end: e.target.value })}
-                        />
-                      </label>
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={row.override}
-                          onChange={(e) => edit(row.id, { override: e.target.checked })}
-                        />
-                        Manual availability override
-                      </label>
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={row.locked}
-                          onChange={(e) => edit(row.id, { locked: e.target.checked })}
-                        />
-                        Keep this confirmed session fixed
-                      </label>
-                    </div>
-                    {row.override && (
-                      <p className="muted">
-                        You explicitly permit this session outside usual availability. Deadlines,
-                        occupied time and maximum daily workload still apply.
-                      </p>
-                    )}
-                  </div>
-                ))}
+                {Array.from(new Set(rows.map((r) => r.start.slice(0, 10))))
+                  .sort()
+                  .map((date) => (
+                    <section className="planning-date-group" key={date}>
+                      <h4>{formatDate(date)}</h4>
+                      {rows
+                        .filter((r) => r.start.slice(0, 10) === date)
+                        .map((row) => (
+                          <div className="planning-suggestion" key={row.id}>
+                            <div className="planning-suggestion-heading">
+                              <label className="check">
+                                <input
+                                  type="checkbox"
+                                  checked={row.selected}
+                                  onChange={(e) => edit(row.id, { selected: e.target.checked })}
+                                />
+                                {row.moveId ? 'Proposed move' : 'Unconfirmed suggestion'} ·{' '}
+                                {row.name}
+                              </label>
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() => setRows(rows.filter((r) => r.id !== row.id))}
+                              >
+                                Remove suggestion
+                              </button>
+                            </div>
+                            <p className="planning-session-time">
+                              {formatTime(row.start)}–{formatTime(row.end)} ·{' '}
+                              {(() => {
+                                try {
+                                  const x = civilRange(row.start, row.end, zone);
+                                  return `${Math.round((x.end - x.start) / minute)} minutes`;
+                                } catch {
+                                  return 'Check session times';
+                                }
+                              })()}
+                            </p>
+                            <button
+                              type="button"
+                              className="button secondary"
+                              aria-expanded={expanded === row.id}
+                              onClick={() => setExpanded(expanded === row.id ? null : row.id)}
+                            >
+                              Edit session
+                            </button>
+                            {expanded === row.id && (
+                              <>
+                                <p className="muted">{row.reason}</p>
+                                <div className="form-grid">
+                                  <label className="field">
+                                    Work
+                                    <select
+                                      value={row.workKey ?? ''}
+                                      onChange={(e) => {
+                                        const work = preview.items.find(
+                                          (w) => w.key === e.target.value,
+                                        );
+                                        edit(row.id, {
+                                          workKey: work?.key ?? null,
+                                          name: work?.name ?? 'Reserved study time',
+                                        });
+                                      }}
+                                    >
+                                      <option value="">Reserve extra study time</option>
+                                      {preview.items.map((w) => (
+                                        <option value={w.key} key={w.key}>
+                                          {w.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    Session title
+                                    <input
+                                      value={row.name}
+                                      maxLength={500}
+                                      required
+                                      onChange={(e) => edit(row.id, { name: e.target.value })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    Start
+                                    <DateTimeInput
+                                      type="datetime-local"
+                                      required
+                                      value={row.start}
+                                      onChange={(e) => edit(row.id, { start: e.target.value })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    End
+                                    <DateTimeInput
+                                      type="datetime-local"
+                                      required
+                                      value={row.end}
+                                      onChange={(e) => edit(row.id, { end: e.target.value })}
+                                    />
+                                  </label>
+                                  <label className="check">
+                                    <input
+                                      type="checkbox"
+                                      checked={row.override}
+                                      onChange={(e) => edit(row.id, { override: e.target.checked })}
+                                    />
+                                    Manual availability override
+                                  </label>
+                                  <label className="check">
+                                    <input
+                                      type="checkbox"
+                                      checked={row.locked}
+                                      onChange={(e) => edit(row.id, { locked: e.target.checked })}
+                                    />
+                                    Keep this confirmed session fixed
+                                  </label>
+                                </div>
+                                {row.override && (
+                                  <p className="muted">
+                                    You explicitly permit this session outside usual availability.
+                                    Deadlines, occupied time and maximum daily workload still apply.
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ))}
+                    </section>
+                  ))}
               </div>
               <button
                 type="button"
@@ -537,6 +684,18 @@ export function SchedulePlanning() {
                 Add manual block
               </button>
             </fieldset>
+            {totals.count === 0 && (
+              <p role="status">Select a session above, or adjust availability and regenerate.</p>
+            )}
+            {totals.invalid && (
+              <p role="alert">Correct the selected session dates and times before approving.</p>
+            )}
+            {confirming && (
+              <p className="notice">
+                Confirm {totals.count} selected sessions ({(totals.minutes / 60).toFixed(1)}h).
+                Scheduling records intended time only.
+              </p>
+            )}
             <div className="form-actions">
               <button
                 type="button"
@@ -563,10 +722,14 @@ export function SchedulePlanning() {
               <button
                 type="button"
                 className="button primary"
-                disabled={busy || !rows.some((r) => r.selected)}
-                onClick={accept}
+                disabled={busy || totals.count === 0 || totals.invalid}
+                onClick={() => (confirming || uncertain ? accept() : setConfirming(true))}
               >
-                {uncertain ? 'Retry same approval' : 'Accept selected changes'}
+                {uncertain
+                  ? 'Retry same approval'
+                  : confirming
+                    ? 'Accept selected sessions'
+                    : 'Review selected sessions'}
               </button>
             </div>
           </div>
@@ -666,5 +829,107 @@ function WorkEstimateEditor({ work }: { work: WorkItem }) {
         </p>
       )}
     </form>
+  );
+}
+
+function ProposalAttention({ proposal, go }: { proposal: Preview; go: (url: string) => void }) {
+  const groups = reviewGroups(proposal);
+  return (
+    <div className="planning-attention" aria-label="Work needing review">
+      {(
+        [
+          [
+            'Missing time estimates',
+            groups.missing,
+            'Set remaining time to include this work.',
+            'Set remaining time',
+          ],
+          [
+            'Not enough study time',
+            groups.capacity,
+            `${(groups.unscheduledMinutes / 60).toFixed(1)}h remains unscheduled within the current availability and deadlines.`,
+            'Adjust availability',
+          ],
+          [
+            'Deadlines needing review',
+            groups.deadlines,
+            'These deadlines have passed. Review the record before planning it.',
+            'Review work',
+          ],
+        ] as const
+      ).map(
+        ([title, items, explanation, action]) =>
+          items.length > 0 && (
+            <section key={title} className="planning-attention-group">
+              <h4>
+                {title} ({items.length})
+              </h4>
+              <p className="muted">{explanation}</p>
+              <ul>
+                {items.slice(0, 3).map((w) => (
+                  <li key={w.workKey}>
+                    {w.name}
+                    {w.minutes !== null ? ` · ${(w.minutes / 60).toFixed(1)}h unscheduled` : ''}
+                    {title === 'Missing time estimates' && (
+                      <details>
+                        <summary>Set remaining time</summary>
+                        <WorkEstimateEditor
+                          work={proposal.items.find((x) => x.key === w.workKey)!}
+                        />
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {items.length > 3 && (
+                <details>
+                  <summary>Show all {items.length} items</summary>
+                  <ul>
+                    {items.slice(3).map((w) => (
+                      <li key={w.workKey}>
+                        {w.name}
+                        {w.minutes !== null ? ` · ${(w.minutes / 60).toFixed(1)}h unscheduled` : ''}
+                        {title === 'Missing time estimates' && (
+                          <details>
+                            <summary>Set remaining time</summary>
+                            <WorkEstimateEditor
+                              work={proposal.items.find((x) => x.key === w.workKey)!}
+                            />
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {title !== 'Missing time estimates' && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() =>
+                    go(title === 'Not enough study time' ? '/settings#availability' : '/tasks')
+                  }
+                >
+                  {action}
+                </button>
+              )}
+            </section>
+          ),
+      )}
+      {proposal.conflicts.length > 0 && (
+        <details className="planning-attention-group">
+          <summary>Scheduling conflicts ({proposal.conflicts.length})</summary>
+          <p className="muted">Review overlapping commitments; confirmed sessions are unchanged.</p>
+          <ul>
+            {proposal.conflicts.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+          <button type="button" className="button secondary" onClick={() => go('/calendar')}>
+            Review schedule
+          </button>
+        </details>
+      )}
+    </div>
   );
 }

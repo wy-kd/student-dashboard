@@ -4204,3 +4204,82 @@ td:first-child {
     grid-column: 2;
   }
 }
+
+.planning-workspace {
+  container: planning / inline-size;
+}
+.planning-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 12px 0;
+}
+.planning-summary > span {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+.planning-summary strong {
+  font-size: 1.15rem;
+  color: var(--text);
+}
+.planning-readiness {
+  padding: 16px 0;
+  border-block: 1px solid var(--border);
+}
+.planning-date-group {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.planning-date-group > h4 {
+  margin: 12px 0 4px;
+}
+.planning-suggestion {
+  padding: 12px;
+}
+.planning-session-time {
+  margin: 4px 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+.planning-attention {
+  display: grid;
+  gap: 12px;
+}
+.planning-attention-group {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.planning-attention-group ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+.planning-attention-group li {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.planning-issue {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+.planning-issue > summary,
+.planned-work-more > summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.planned-work-more[open] {
+  display: grid;
+  gap: 8px;
+}
+.planning-workspace button {
+  min-height: 44px;
+}
+@container planning (max-width: 540px) {
+  .planning-suggestion .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .planning-workspace .form-actions {
+    flex-wrap: wrap;
+  }
+}
