@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createTimerSync } from '../lib/timer-client';
-import { readSidebarPreference, saveSidebarPreference } from '../lib/navigation-preference';
+import {
+  readSidebarPreference,
+  saveSidebarPreference,
+  readSidebarScroll,
+  saveSidebarScroll,
+} from '../lib/navigation-preference';
 import {
   watchTimer,
   announceTimerChange,
@@ -37,6 +42,47 @@ test('sidebar choice survives reload and keeps independent browser preferences',
   };
   assert.equal(readSidebarPreference(unavailable, true), true);
   assert.doesNotThrow(() => saveSidebarPreference(unavailable, true));
+});
+test('sidebar scroll storage is tab-local, mode-specific, bounded and resilient to unavailable storage', () => {
+  const map = new Map<string, string>(),
+    storage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        map.set(key, value);
+      },
+    };
+  saveSidebarScroll(storage, 'desktop', 240);
+  saveSidebarScroll(storage, 'mobile', 80);
+  assert.equal(readSidebarScroll(storage, 'desktop'), 240);
+  assert.equal(readSidebarScroll(storage, 'mobile'), 80);
+  map.set('student-sidebar-scroll-desktop', 'NaN');
+  assert.equal(readSidebarScroll(storage, 'desktop'), 0);
+  map.set('student-sidebar-scroll-desktop', '-20');
+  assert.equal(readSidebarScroll(storage, 'desktop'), 0);
+  assert.equal(
+    readSidebarScroll(
+      {
+        getItem() {
+          throw Error();
+        },
+      },
+      'desktop',
+    ),
+    0,
+  );
+  assert.doesNotThrow(() =>
+    saveSidebarScroll(
+      {
+        setItem() {
+          throw Error();
+        },
+      },
+      'desktop',
+      10,
+    ),
+  );
+  assert.match(readFileSync('app/layout.tsx', 'utf8'), /<Workspace \/>/);
+  assert.doesNotMatch(readFileSync('app/[[...view]]/page.tsx', 'utf8'), /<Workspace/);
 });
 test('timer client holds idle requests, resumes on visibility, discards stale replies and stops on logout', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

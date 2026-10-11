@@ -6,6 +6,7 @@ import { AppContext } from '../components/context';
 import { SchedulePlanning } from '../components/SchedulePlanning';
 import { generateSchedule } from '../lib/planning-engine';
 import { instant } from '../lib/planning-time';
+import { AppSidebar } from '../components/AppNavigation';
 import { Inbox } from '../components/Inbox';
 import { QuickAdd } from '../components/QuickAdd';
 import { QuickCapture } from '../components/QuickCapture';
@@ -737,6 +738,78 @@ test('Inbox processing has separate counts, safe conversion retry and an explici
   assert.match(document.body.textContent!, /To review \(0\)/);
   assert.match(document.body.textContent!, /Original capture retained/);
   assert.match(document.body.textContent!, /Inbox review reminders · Off/);
+});
+test('The real sidebar retains one DOM node and scroll through route, collapse, Back/Forward and refresh', async () => {
+  await render(null);
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  const sidebar = (route: string, collapsed = false) =>
+    React.createElement(AppSidebar, {
+      route,
+      collapsed,
+      menu: false,
+      toggleSidebar() {},
+      onSignOut() {},
+    });
+  await render(sidebar('tasks'));
+  const nav = document.querySelector('.sidebar nav') as HTMLElement;
+  await act(async () => new Promise((r) => setTimeout(r, 30)));
+  nav.scrollTop = 230;
+  await act(async () => nav.dispatchEvent(new dom.window.Event('scroll', { bubbles: true })));
+  assert.equal(window.sessionStorage.getItem('student-sidebar-scroll-desktop'), '230');
+  for (const [route, collapsed] of [
+    ['settings', false],
+    ['calendar', true],
+    ['tasks', false],
+    ['calendar', false],
+  ] as const) {
+    await render(sidebar(route, collapsed));
+    assert.ok(
+      document.querySelector('.sidebar nav') === nav,
+      'navigation retains its DOM identity',
+    );
+    assert.equal(nav.scrollTop, 230);
+    assert.equal(nav.querySelector('[aria-current=page]')?.getAttribute('href'), '/' + route);
+  }
+  // Browser history changes feed the same route props in the persistent workspace.
+  window.history.pushState({}, '', '/tasks');
+  await render(sidebar('tasks'));
+  window.history.pushState({}, '', '/calendar');
+  await render(sidebar('calendar'));
+  await act(async () => {
+    window.history.back();
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  await render(sidebar(window.location.pathname.slice(1)));
+  assert.equal(nav.scrollTop, 230);
+  await act(async () => {
+    window.history.forward();
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  await render(sidebar(window.location.pathname.slice(1)));
+  assert.equal(nav.scrollTop, 230);
+  for (const link of nav.querySelectorAll<HTMLAnchorElement>('a')) {
+    link.focus();
+    assert.ok(document.activeElement === link);
+  }
+  await render(null);
+  await render(sidebar('calendar'));
+  assert.equal((document.querySelector('.sidebar nav') as HTMLElement).scrollTop, 230);
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+  await render(
+    React.createElement(AppSidebar, {
+      route: 'calendar',
+      collapsed: false,
+      menu: true,
+      toggleSidebar() {},
+      onSignOut() {},
+    }),
+  );
+  assert.equal(
+    (document.querySelector('.sidebar nav') as HTMLElement).scrollTop,
+    0,
+    'mobile has an independent saved position',
+  );
+  window.history.replaceState({}, '', '/');
 });
 test.after(async () => {
   await act(async () => root.unmount());

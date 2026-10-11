@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { Workspace } from '@/components/Workspace';
 export const metadata: Metadata = {
   title: 'Student Dashboard',
   description: 'Your subjects, deadlines and next steps in one local workspace.',
@@ -16,7 +17,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <Workspace />
+        {children}
+      </body>
     </html>
   );
 }

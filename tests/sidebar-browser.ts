@@ -59,9 +59,21 @@ export async function checkSidebar() {
     'Collapsed choice must be saved.',
   );
   await checkScrolling();
+  const persistentNav = get('.sidebar nav');
+  persistentNav.scrollTop = Math.max(
+    0,
+    (persistentNav.scrollHeight - persistentNav.clientHeight) / 2,
+  );
+  await paint();
+  const savedTop = persistentNav.scrollTop;
   get('.sidebar a[href="/tasks"]').click();
   await paint();
   assert(get('.sidebar').getBoundingClientRect().width === 76, 'Navigation must retain collapse.');
+  assert(get('.sidebar nav') === persistentNav, 'Navigation must keep its DOM identity.');
+  assert(
+    Math.abs(persistentNav.scrollTop - savedTop) < 2,
+    'Navigation must preserve sidebar scroll.',
+  );
   const active = get('.sidebar a[href="/tasks"]');
   assert(
     active.getAttribute('aria-current') === 'page' && active.title === 'Tasks',

@@ -303,6 +303,8 @@ code {
 .sidebar nav {
   /* Hide the native scrollbar without disabling wheel, touch or keyboard scrolling. */
   scrollbar-width: none;
+  overflow-anchor: none;
+  scroll-behavior: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;

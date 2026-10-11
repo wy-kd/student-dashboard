@@ -1,4 +1,5 @@
 'use client';
+import { useSidebarScroll } from './useSidebarScroll';
 import { actionableInbox } from '@/lib/inbox-state';
 import { instant } from '@/lib/planning-time';
 import { useApp } from './context';
@@ -54,6 +55,7 @@ export function AppSidebar({
   onSignOut: () => void;
 }) {
   const { allData, data, go, now } = useApp();
+  const scroll = useSidebarScroll(route, collapsed, menu);
   return (
     <aside className={'sidebar ' + (menu ? 'open' : '')}>
       <button className="brand" aria-label="Dashboard" onClick={() => go('/')}>
@@ -73,7 +75,7 @@ export function AppSidebar({
         <span>{collapsed ? 'Expand' : 'Collapse'}</span>
       </button>
       <div className="workspace-label">STUDENT WORKSPACE</div>
-      <nav aria-label="Main navigation">
+      <nav aria-label="Main navigation" ref={scroll.ref} onScroll={scroll.onScroll}>
         {navigation.map(([url, label, Icon]) => (
           <a
             key={url}
@@ -97,7 +99,7 @@ export function AppSidebar({
                 {
                   actionableInbox(
                     allData.productivity?.inbox ?? [],
-                    instant(now, allData.setting.timezone),
+                    instant(now, allData.setting.timezone ?? 'Australia/Brisbane'),
                   ).length
                 }
               </small>
