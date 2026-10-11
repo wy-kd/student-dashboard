@@ -91,7 +91,7 @@ export async function saveRow(
     const client = tx as any;
     let createId: string | undefined;
     if (!id && requestId) {
-      if (entity !== 'assignment' && entity !== 'task')
+      if (entity !== 'assignment' && entity !== 'task' && entity !== 'exam')
         throw new AppError('Unsupported create request.');
       createId = `${entity}-${z.string().uuid().parse(requestId)}`;
       const previous = await client[entity].findUnique({ where: { id: createId } });

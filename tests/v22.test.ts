@@ -161,9 +161,29 @@ test('assignment creation validates required fields, remains optional and retrie
     React.createElement(Editor, { editor: { entity: 'assignment' }, close() {} }),
     await snapshot(),
   );
-  assert.match(html, /Assignment &amp; deadline|Workload &amp; weighting/);
+  assert.match(html, /More options/);
   assert.match(html, /Estimated total hours \(optional\)/);
   assert.match(html, /Fields marked \* are required/);
+});
+test('Exam Quick Create retries use one record and retain default duration and saved optional fields', async () => {
+  const requestId = randomUUID();
+  const input = {
+    ...defaults('exam'),
+    name: 'Quick exam',
+    subjectId: subject.id,
+    dueAt: '2026-10-20T09:00',
+    location: 'Library',
+    notes: 'Keep note',
+  };
+  const before = await db.exam.count();
+  const first = await saveRow('exam', input, undefined, undefined, requestId);
+  const retry = await saveRow('exam', input, undefined, undefined, requestId);
+  assert.equal(first.id, retry.id);
+  assert.equal(await db.exam.count(), before + 1);
+  assert.equal(first.duration, 120);
+  assert.equal(first.location, 'Library');
+  assert.equal(first.notes, 'Keep note');
+  await assert.rejects(saveRow('exam', { ...input, subjectId: '' }));
 });
 test('manual breakdown and selected edited template steps create normal assignment/subject-linked Tasks in draft order', async () => {
   const a = await createAssignment();

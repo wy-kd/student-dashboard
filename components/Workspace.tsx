@@ -184,7 +184,7 @@ export function Workspace() {
       }),
     });
     const b = await res.json();
-    if (!res.ok) throw Error(b.error);
+    if (!res.ok) throw Object.assign(Error(b.error), { status: res.status });
     try {
       await reload();
       notify('Saved.');
@@ -200,7 +200,7 @@ export function Workspace() {
       body: JSON.stringify({ entity, id: row.id, revision: row.revision }),
     });
     const b = await res.json();
-    if (!res.ok) throw Error(b.error);
+    if (!res.ok) throw Object.assign(Error(b.error), { status: res.status });
     await reload();
     notify('Deleted.');
   }
@@ -225,7 +225,7 @@ export function Workspace() {
         body: JSON.stringify({ password, setupToken }),
       });
       const b = await res.json();
-      if (!res.ok) throw Error(b.error);
+      if (!res.ok) throw Object.assign(Error(b.error), { status: res.status });
       setPassword('');
       setSetupToken('');
       await check();

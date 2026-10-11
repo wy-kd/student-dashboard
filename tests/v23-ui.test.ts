@@ -6,6 +6,8 @@ import { AppContext } from '../components/context';
 import { SchedulePlanning } from '../components/SchedulePlanning';
 import { generateSchedule } from '../lib/planning-engine';
 import { instant } from '../lib/planning-time';
+import { Editor } from '../components/Editor';
+import { defaults } from '../lib/model';
 import { Availability } from '../components/Availability';
 import { Calendar } from '../components/Planning';
 import { Today } from '../components/DailyPlanning';
@@ -67,6 +69,9 @@ let node: React.ReactNode,
   writes = 0,
   fail = false,
   lastPayload: any;
+let saveFailure: 'validation' | 'network' | null = null;
+const recordRequests: any[] = [];
+let closedEditor = false;
 const oldFetch = globalThis.fetch;
 function tree() {
   return React.createElement(
@@ -80,7 +85,16 @@ function tree() {
           await render();
         },
         open() {},
-        save: async () => {},
+        save: async (entity, values, old, requestId) => {
+          recordRequests.push({ entity, values: structuredClone(values), old, requestId });
+          if (saveFailure === 'validation')
+            throw Object.assign(Error('Choose a subject'), { status: 400 });
+          if (saveFailure === 'network') {
+            saveFailure = null;
+            throw Error('Lost response');
+          }
+          return { ...values, id: old?.id ?? entity + '-created', revision: 0 };
+        },
         remove: async () => {},
         notify() {},
         go(url: string) {
@@ -106,10 +120,12 @@ async function click(element: HTMLElement) {
 }
 async function input(element: HTMLInputElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(
-      element,
-      value,
-    );
+    Object.getOwnPropertyDescriptor(
+      element.tagName === 'TEXTAREA'
+        ? dom.window.HTMLTextAreaElement.prototype
+        : dom.window.HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(element, value);
     element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     element.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
   });
@@ -500,6 +516,89 @@ test('Past-plan review is neutral; Keep and Cancel do not write and an accepted 
   assert.equal(data.planning!.blocks.length, 1);
   assert.equal(block.startAt, instant('2026-10-12T14:00', 'Australia/Brisbane'));
   assert.equal(data.studySession.length, 0);
+});
+test('Quick Create shows core fields, retains advanced drafts and optional Task links, and retries the same creation', async () => {
+  data.subject = [{ id: 'creation-subject', code: 'IFB240', name: 'Security' }];
+  for (const entity of ['assignment', 'exam', 'task'] as const) {
+    await render(null);
+    await render(
+      React.createElement(Editor, {
+        editor: { entity },
+        close() {
+          closedEditor = true;
+        },
+      }),
+    );
+    const form = document.querySelector('dialog form')!;
+    const more = form.querySelector('details')!;
+    assert.equal(more.open, false);
+    assert.ok(!more.contains(form.querySelector('#field-name')));
+    if (entity !== 'task') assert.ok(!more.contains(form.querySelector('#field-dueAt')));
+    if (entity === 'task')
+      assert.equal((form.querySelector('#field-dueAt') as HTMLInputElement).value, '');
+    more.open = true;
+    await input(form.querySelector('#field-name') as HTMLInputElement, 'Quick creation');
+    await input(form.querySelector('#field-notes') as HTMLInputElement, 'Keep advanced note');
+    more.open = false;
+    if (entity !== 'task')
+      await select(form.querySelector('#field-subjectId')!, 'creation-subject');
+    saveFailure = 'validation';
+    await submit(form as HTMLFormElement);
+    assert.match(form.textContent!, /Choose a subject/);
+    assert.equal(
+      (form.querySelector('#field-notes') as HTMLInputElement).value,
+      'Keep advanced note',
+    );
+    saveFailure = 'network';
+    await submit(form as HTMLFormElement);
+    assert.ok(button('Retry same creation'));
+    assert.ok((form.querySelector('#field-name') as HTMLInputElement).matches(':disabled'));
+    const before = recordRequests.at(-1);
+    await submit(form as HTMLFormElement);
+    assert.deepEqual(recordRequests.at(-1), before);
+    assert.equal(recordRequests.at(-1).values.notes, 'Keep advanced note');
+    assert.ok(recordRequests.at(-1).requestId);
+  }
+});
+test('Full edit loads advanced saved fields and dirty-close rejection retains the editor draft', async () => {
+  await render(null);
+  const row = {
+    ...defaults('exam'),
+    id: 'existing-exam',
+    subjectId: 'creation-subject',
+    revision: 4,
+    name: 'Saved exam',
+    notes: 'Saved notes',
+    location: 'Library',
+    duration: 95,
+    dueAt: '2026-10-20T09:00',
+  };
+  const previous = globalThis.confirm;
+  globalThis.confirm = () => false;
+  try {
+    closedEditor = false;
+    await render(
+      React.createElement(Editor, {
+        editor: { entity: 'exam', row },
+        close() {
+          closedEditor = true;
+        },
+      }),
+    );
+    assert.equal(document.querySelector('details')!.open, true);
+    await input(document.querySelector('#field-name') as HTMLInputElement, 'Edited exam');
+    await click(button('Cancel'));
+    assert.equal(closedEditor, false);
+    assert.equal((document.querySelector('#field-name') as HTMLInputElement).value, 'Edited exam');
+    await submit(document.querySelector('dialog form')!);
+    const saved = recordRequests.at(-1);
+    assert.equal(saved.values.location, 'Library');
+    assert.equal(saved.values.duration, 95);
+    assert.equal(saved.values.notes, 'Saved notes');
+    assert.equal(saved.old.revision, 4);
+  } finally {
+    globalThis.confirm = previous;
+  }
 });
 test.after(async () => {
   await act(async () => root.unmount());

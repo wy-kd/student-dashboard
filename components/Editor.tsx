@@ -21,13 +21,24 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
     ),
     ...Object.fromEntries(
       fields[entity]
-        .filter((f) => f.type === 'datetime-local')
+        .filter((f) => f.type === 'datetime-local' && (entity !== 'task' || f.required))
         .map((f) => [f.key, now.slice(0, 10) + 'T17:00']),
     ),
     ...prefill,
     ...row,
   }));
-  const createRequest = useRef<string | null>(null);
+  const initial = useRef(JSON.stringify(values));
+  const createRequest = useRef<string | null>(null),
+    submitting = useRef(false),
+    pendingValues = useRef<Record<string, any> | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  const quick = !row && ['assignment', 'exam', 'task'].includes(entity);
+  function cancel() {
+    if (submitting.current || uncertain) return;
+    if (JSON.stringify(values) !== initial.current && !confirm('Discard your unsaved changes?'))
+      return;
+    close();
+  }
   const [created, setCreated] = useState<RecordRow | null>(null),
     [breaking, setBreaking] = useState(false);
   const [busy, setBusy] = useState(false),
@@ -37,17 +48,36 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
   }, []);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError('');
     try {
-      if (!row && (entity === 'assignment' || entity === 'task'))
+      if (!row && ['assignment', 'task', 'exam'].includes(entity))
         createRequest.current ??= todoRequestId();
-      const saved = await save(entity, values, row, createRequest.current ?? undefined);
+      pendingValues.current ??= structuredClone(values);
+      const saved = await save(
+        entity,
+        pendingValues.current,
+        row,
+        createRequest.current ?? undefined,
+      );
+      pendingValues.current = null;
+      setUncertain(false);
       if (entity === 'assignment' && !row && saved) setCreated(saved);
       else close();
     } catch (e: any) {
-      setError(e.message);
+      if (createRequest.current && (!e.status || e.status >= 500)) {
+        setUncertain(true);
+        setError(
+          'The save response was interrupted. Retry the same creation before editing to avoid duplicates.',
+        );
+      } else {
+        pendingValues.current = null;
+        setError(e.message);
+      }
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -150,12 +180,17 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
       </label>
     );
   }
-  const essentials = fields[entity].filter(
-    (f) =>
-      f.required ||
-      ['dueAt', 'weighting', 'score', 'maximum', 'plannedHours'].includes(f.key) ||
-      (entity === 'assignment' && f.key === 'estimatedHours') ||
-      (entity === 'grade' && ['assignmentId', 'examId'].includes(f.key)),
+  const quickKeys =
+    entity === 'task'
+      ? ['name', 'dueAt', 'subjectId', 'assignmentId', 'examId']
+      : ['name', 'subjectId', 'dueAt'];
+  const essentials = fields[entity].filter((f) =>
+    quick
+      ? quickKeys.includes(f.key)
+      : f.required ||
+        ['dueAt', 'weighting', 'score', 'maximum', 'plannedHours'].includes(f.key) ||
+        (entity === 'assignment' && f.key === 'estimatedHours') ||
+        (entity === 'grade' && ['assignmentId', 'examId'].includes(f.key)),
   );
   const extra = fields[entity].filter((f) => !essentials.includes(f));
   if (created && breaking) return <AssignmentBreakdown assignment={created} close={close} />;
@@ -169,8 +204,8 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
       className="editor"
       aria-label={(row ? 'Edit ' : 'New ') + labels[entity]}
       onCancel={(e) => {
-        if (busy) e.preventDefault();
-        else close();
+        e.preventDefault();
+        cancel();
       }}
     >
       <form onSubmit={submit}>
@@ -185,15 +220,17 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
             type="button"
             className="icon-button"
             aria-label="Close editor"
-            onClick={close}
-            disabled={busy}
+            onClick={cancel}
+            disabled={busy || uncertain}
           >
             <X size={21} />
           </button>
         </div>
         {(entity === 'task' || entity === 'studySession' || entity === 'grade') && (
           <p className="muted">
-            Link an assignment or an exam. The subject follows your selection.
+            {entity === 'task'
+              ? 'Subject and assessment links are optional. A linked assessment supplies its subject.'
+              : 'Link an assignment or an exam. The subject follows your selection.'}
           </p>
         )}
         {entity === 'assignment' && (
@@ -207,47 +244,63 @@ export function Editor({ editor, close }: { editor: EditorType; close: () => voi
             Revision topics control progress when added. Use manual progress before adding topics.
           </p>
         )}
-        {entity === 'assignment' ? (
-          <>
-            <fieldset className="assignment-form-group">
-              <legend>Assignment & deadline</legend>
+        <fieldset className="availability-fieldset" disabled={busy || uncertain}>
+          {quick ? (
+            <>
               <p className="muted">Fields marked * are required.</p>
-              <div className="form-grid">{essentials.filter((f) => f.required).map(control)}</div>
-            </fieldset>
-            <fieldset className="assignment-form-group">
-              <legend>Workload & weighting (optional)</legend>
-              <div className="form-grid">{essentials.filter((f) => !f.required).map(control)}</div>
-            </fieldset>
-          </>
-        ) : (
-          <div className="form-grid">{essentials.map(control)}</div>
-        )}
-        {entity === 'task' && (
-          <ManualProgressNotice
-            assignment={allData.assignment.find((a) => a.id === values.assignmentId)}
-          />
-        )}
-        {extra.length > 0 && (
-          <details className="more-fields" open={!!row}>
-            <summary>
-              {entity === 'assignment'
-                ? 'Status, priority & additional details (optional)'
-                : 'More details'}
-            </summary>
-            <div className="form-grid">{extra.map(control)}</div>
-          </details>
-        )}
+              <div className="form-grid">{essentials.map(control)}</div>
+            </>
+          ) : entity === 'assignment' ? (
+            <>
+              <fieldset className="assignment-form-group">
+                <legend>Assignment & deadline</legend>
+                <p className="muted">Fields marked * are required.</p>
+                <div className="form-grid">{essentials.filter((f) => f.required).map(control)}</div>
+              </fieldset>
+              <fieldset className="assignment-form-group">
+                <legend>Workload & weighting (optional)</legend>
+                <div className="form-grid">
+                  {essentials.filter((f) => !f.required).map(control)}
+                </div>
+              </fieldset>
+            </>
+          ) : (
+            <div className="form-grid">{essentials.map(control)}</div>
+          )}
+          {entity === 'task' && (
+            <ManualProgressNotice
+              assignment={allData.assignment.find((a) => a.id === values.assignmentId)}
+            />
+          )}
+          {extra.length > 0 && (
+            <details className="more-fields" open={!!row}>
+              <summary>More options</summary>
+              <div className="form-grid">{extra.map(control)}</div>
+            </details>
+          )}
+        </fieldset>
         {error && (
           <p role="alert" className="error">
             {error}
           </p>
         )}
         <div className="dialog-actions">
-          <button type="button" className="button secondary" onClick={close} disabled={busy}>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={cancel}
+            disabled={busy || uncertain}
+          >
             Cancel
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? 'Saving…' : row ? 'Save changes' : 'Create ' + labels[entity].toLowerCase()}
+            {busy
+              ? 'Saving…'
+              : uncertain
+                ? 'Retry same creation'
+                : row
+                  ? 'Save changes'
+                  : 'Create ' + labels[entity].toLowerCase()}
           </button>
         </div>
       </form>
