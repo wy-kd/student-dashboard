@@ -138,6 +138,17 @@ globalThis.fetch = async (_url: any, init: any) => {
   lastPayload = payload;
   if (fail)
     return new Response(JSON.stringify({ error: 'Simulated stale availability' }), { status: 409 });
+  if (action === 'availability.exception') {
+    writes++;
+    data.planning!.preference.revision++;
+    data.planning!.exceptions = [
+      ...data.planning!.exceptions.filter((x) => x.date !== payload.date),
+      ...(payload.windows === null ? [] : [{ date: payload.date, windows: payload.windows }]),
+    ];
+    return new Response(
+      JSON.stringify({ result: { ...payload, revision: data.planning!.preference.revision } }),
+    );
+  }
   if (action === 'availability.save') {
     const value = availabilitySchema.parse(payload);
     writes++;
@@ -241,25 +252,40 @@ test('Availability editor copies days, edits multiple periods/exceptions, preser
   await click(button('Cancel / reset unsaved changes'));
   assert.equal(monday.querySelectorAll('input').length, 2);
   assert.equal(writes, 1);
-  const exception = document.querySelector('input[type=date]') as HTMLInputElement;
+  const scope = document.querySelector('[aria-label="Date-specific availability"]')!;
+  const exception = scope.querySelector('input[type=date]') as HTMLInputElement;
   await input(exception, '2026-10-14');
-  await click(button('Add exception'));
-  assert.match(document.body.textContent!, /Unavailable on this date/);
-  await click(button('Add replacement period'));
+  assert.match(scope.textContent!, /Wednesday, 14 October 2026/);
+  await click(button('Add period', scope));
   fail = true;
-  await submit(document.querySelector('form')!);
-  assert.match(document.body.textContent!, /Simulated stale availability/);
-  assert.ok(button('Remove exception'));
+  await submit(scope.querySelector('form')!);
+  assert.match(scope.textContent!, /Simulated stale availability/);
+  assert.equal(scope.querySelectorAll('input[type=time]').length, 4);
   assert.equal(writes, 1, 'failed save retains draft without mutation');
   fail = false;
-  await submit(document.querySelector('form')!);
+  // Leave an unrelated weekly change unsaved; a date save must not submit it.
+  await input(monday.querySelectorAll('input')[0], '08:00');
+  await submit(scope.querySelector('form')!);
   assert.equal(writes, 2);
-  assert.deepEqual(lastPayload.exceptions, [
-    { date: '2026-10-14', windows: [{ startTime: '19:00', endTime: '21:00' }] },
+  assert.equal(data.planning!.windows[0].startTime, '10:00');
+  assert.equal((monday.querySelector('input') as HTMLInputElement).value, '08:00');
+  assert.deepEqual(lastPayload.windows, [
+    { startTime: '09:00', endTime: '12:00' },
+    { startTime: '14:00', endTime: '17:00' },
   ]);
-  await click(button('Remove exception'));
-  await submit(document.querySelector('form')!);
-  assert.deepEqual(lastPayload.exceptions, []);
+  assert.match(scope.textContent!, /Saved for Wednesday, 14 October 2026/);
+  await render(null);
+  await render(React.createElement(Availability));
+  const reopened = document.querySelector('[aria-label="Date-specific availability"]')!;
+  await click(button('Edit date change', reopened));
+  assert.equal(reopened.querySelectorAll('input[type=time]').length, 4);
+  await select(reopened.querySelector('select')!, 'unavailable');
+  await submit(reopened.querySelector('form')!);
+  assert.deepEqual(lastPayload.windows, []);
+  await select(reopened.querySelector('select')!, 'weekly');
+  await submit(reopened.querySelector('form')!);
+  assert.equal(lastPayload.windows, null);
+  assert.deepEqual(data.planning!.exceptions, []);
 });
 
 test('Scheduling preview edits and selective approval retain uncertain requests, while Cancel makes no changes', async () => {

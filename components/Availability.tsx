@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useApp } from './context';
 import { Section } from './ui';
+import { AvailabilityExceptions } from './AvailabilityExceptions';
 import { DateTimeInput } from './DateTimeInput';
 import { availabilityDraft } from '@/lib/planning-availability';
 import { requestPlanning } from '@/lib/planning-client';
@@ -13,8 +14,7 @@ export function Availability() {
   const [draft, setDraft] = useState(() => availabilityDraft(d.planning)),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [saved, setSaved] = useState(''),
-    [exceptionDate, setExceptionDate] = useState('');
+    [saved, setSaved] = useState('');
   function update(value: typeof draft) {
     setDraft(value);
     setSaved('');
@@ -147,102 +147,6 @@ export function Availability() {
             ))}
           </div>
           <details className="more-fields">
-            <summary>Date-specific availability</summary>
-            <p>
-              Replace only this date's usual periods. No periods means unavailable. Remove an
-              exception to restore the weekly rule.
-            </p>
-            <div className="inline">
-              <label className="field">
-                Exception date
-                <DateTimeInput
-                  type="date"
-                  value={exceptionDate}
-                  onChange={(e) => setExceptionDate(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={!exceptionDate || draft.exceptions.some((e) => e.date === exceptionDate)}
-                onClick={() => {
-                  update({
-                    ...draft,
-                    exceptions: [...draft.exceptions, { date: exceptionDate, windows: [] }],
-                  });
-                  setExceptionDate('');
-                }}
-              >
-                Add exception
-              </button>
-            </div>
-            {draft.exceptions.map((exception, i) => (
-              <div className="availability-day" key={exception.date}>
-                <h3>{exception.date}</h3>
-                {!exception.windows.length && <p className="muted">Unavailable on this date</p>}
-                {exception.windows.map((w: any, n: number) =>
-                  windowFields(
-                    w,
-                    (value) =>
-                      update({
-                        ...draft,
-                        exceptions: draft.exceptions.map((x, j) =>
-                          j === i
-                            ? {
-                                ...x,
-                                windows: x.windows.map((v: any, k: number) =>
-                                  k === n ? value : v,
-                                ),
-                              }
-                            : x,
-                        ),
-                      }),
-                    () =>
-                      update({
-                        ...draft,
-                        exceptions: draft.exceptions.map((x, j) =>
-                          j === i
-                            ? { ...x, windows: x.windows.filter((_: any, k: number) => k !== n) }
-                            : x,
-                        ),
-                      }),
-                    'exception-' + n,
-                  ),
-                )}
-                <div className="inline">
-                  <button
-                    type="button"
-                    className="button secondary"
-                    onClick={() =>
-                      update({
-                        ...draft,
-                        exceptions: draft.exceptions.map((x, j) =>
-                          j === i
-                            ? {
-                                ...x,
-                                windows: [...x.windows, { startTime: '19:00', endTime: '21:00' }],
-                              }
-                            : x,
-                        ),
-                      })
-                    }
-                  >
-                    Add replacement period
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() =>
-                      update({ ...draft, exceptions: draft.exceptions.filter((_, j) => j !== i) })
-                    }
-                  >
-                    Remove exception
-                  </button>
-                </div>
-              </div>
-            ))}
-          </details>
-          <details className="more-fields">
             <summary>Session preferences</summary>
             <div className="form-grid">
               {(
@@ -309,6 +213,19 @@ export function Availability() {
           </button>
         </div>
       </form>
+      <AvailabilityExceptions
+        revision={draft.revision}
+        onSaved={(result) => {
+          setDraft((current) => ({
+            ...current,
+            revision: result.revision,
+            exceptions: [
+              ...current.exceptions.filter((x) => x.date !== result.date),
+              ...(result.windows === null ? [] : [{ date: result.date, windows: result.windows }]),
+            ],
+          }));
+        }}
+      />
       <Commitments />
     </Section>
   );

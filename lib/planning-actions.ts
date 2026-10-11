@@ -3,7 +3,7 @@ import { db } from './db';
 import { AppError, snapshot, validateRelations } from './service';
 import { generateSchedule, workItems } from './planning-engine';
 import { planningFingerprint, approveSchedule, undoSchedule } from './planning-approval';
-import { availabilitySchema } from './planning-model';
+import { availabilitySchema, defaultPlanningPreferences } from './planning-model';
 import { civilRange, instant } from './planning-time';
 import { suggestAdjustment } from './planning-adjustments';
 const revisionSchema = z.number().int().nonnegative();
@@ -30,6 +30,63 @@ export async function saveAvailability(userId: string, input: unknown) {
         data: { userId, date: exception.date, windows: JSON.stringify(exception.windows) },
       });
     return preference;
+  });
+}
+/** Patch one date against the persisted profile; never submit unrelated browser drafts. */
+export async function saveAvailabilityException(userId: string, input: unknown) {
+  const value = z
+    .object({
+      revision: revisionSchema,
+      date: z.string(),
+      windows: z
+        .array(z.object({ startTime: z.string(), endTime: z.string() }).strict())
+        .nullable(),
+    })
+    .strict()
+    .parse(input);
+  return db.$transaction(async (tx) => {
+    const old = await tx.schedulingPreference.findUnique({ where: { userId } });
+    if ((old?.revision ?? 0) !== value.revision)
+      throw new AppError(
+        'Availability changed on another device. Reload the saved settings before retrying; your draft has been kept.',
+        409,
+      );
+    // Use the same validation as the complete profile, including date and overlap checks.
+    availabilitySchema.parse({
+      revision: value.revision,
+      preferences: old
+        ? {
+            preferredMinutes: old.preferredMinutes,
+            minimumMinutes: old.minimumMinutes,
+            restMinutes: old.restMinutes,
+            maxDailyMinutes: old.maxDailyMinutes,
+          }
+        : defaultPlanningPreferences,
+      windows: [],
+      exceptions: [{ date: value.date, windows: value.windows ?? [] }],
+    });
+    const count = await tx.availabilityException.count({ where: { userId } });
+    const existing = await tx.availabilityException.findUnique({
+      where: { userId_date: { userId, date: value.date } },
+    });
+    if (value.windows && !existing && count >= 366)
+      throw new AppError(
+        'Up to 366 date-specific changes can be saved. Remove an old change first.',
+      );
+    if (value.windows === null)
+      await tx.availabilityException.deleteMany({ where: { userId, date: value.date } });
+    else
+      await tx.availabilityException.upsert({
+        where: { userId_date: { userId, date: value.date } },
+        create: { userId, date: value.date, windows: JSON.stringify(value.windows) },
+        update: { windows: JSON.stringify(value.windows) },
+      });
+    const preference = await tx.schedulingPreference.upsert({
+      where: { userId },
+      create: { userId, ...defaultPlanningPreferences, revision: 1 },
+      update: { revision: { increment: 1 } },
+    });
+    return { revision: preference.revision, date: value.date, windows: value.windows };
   });
 }
 export async function saveCommitment(userId: string, input: unknown) {
@@ -137,6 +194,7 @@ export async function planningAction(userId: string, b: any) {
       ]),
     };
   }
+  if (b.action === 'availability.exception') return saveAvailabilityException(userId, b.data);
   if (b.action === 'availability.save') return saveAvailability(userId, b.data);
   if (b.action === 'commitment.save') return saveCommitment(userId, b.data);
   if (b.action === 'commitment.delete') return deleteCommitment(userId, b.data);

@@ -70,6 +70,64 @@ test('Availability CRUD supports multiple windows, exceptions, unavailable dates
     false,
   );
 });
+test('Localised date saves survive reopening, preserve other settings and affect capacity immediately', async () => {
+  const { saveAvailabilityException } = await import('../lib/planning-actions');
+  const before = await planningSnapshot();
+  let result = await saveAvailabilityException('owner', {
+    revision: before.preference.revision,
+    date: '2026-10-12',
+    windows: [
+      { startTime: '18:00', endTime: '19:00' },
+      { startTime: '20:00', endTime: '22:00' },
+    ],
+  });
+  let reopened = await planningSnapshot();
+  assert.deepEqual(reopened.windows, before.windows);
+  assert.equal(reopened.preference.preferredMinutes, before.preference.preferredMinutes);
+  assert.equal(
+    availableOn(await snapshot(), '2026-10-12').reduce((n, x) => n + intervalMinutes(x), 0),
+    180,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      (await db.availabilityException.findFirstOrThrow({ where: { date: result.date } })).windows,
+    ),
+    reopened.exceptions[0].windows,
+  );
+  await assert.rejects(
+    saveAvailabilityException('owner', { ...result, revision: before.preference.revision }),
+    /changed on another device/,
+  );
+  await assert.rejects(
+    saveAvailabilityException('owner', {
+      ...result,
+      windows: [
+        { startTime: '18:00', endTime: '20:00' },
+        { startTime: '19:00', endTime: '21:00' },
+      ],
+    }),
+    /overlap/,
+  );
+  await assert.rejects(saveAvailabilityException('owner', { ...result, date: '2026-02-30' }));
+  result = await saveAvailabilityException('owner', { ...result, windows: [] });
+  assert.equal(availableOn(await snapshot(), result.date).length, 0);
+  result = await saveAvailabilityException('owner', {
+    ...result,
+    windows: [{ startTime: '19:00', endTime: '21:00' }],
+  });
+  assert.equal(
+    availableOn(await snapshot(), result.date).reduce((n, x) => n + intervalMinutes(x), 0),
+    120,
+  );
+  await saveAvailabilityException('owner', { ...result, windows: null });
+  reopened = await planningSnapshot();
+  assert.equal(reopened.exceptions.length, 0);
+  assert.deepEqual(reopened.windows, before.windows);
+  assert.equal(
+    availableOn(await snapshot(), result.date).reduce((n, x) => n + intervalMinutes(x), 0),
+    360,
+  );
+});
 test('Existing commitments exclude occupied intervals once; deadlines/informational dates never block; breaks suppress classes', async () => {
   const sem = await saveRow('semester', {
     ...defaults('semester'),
