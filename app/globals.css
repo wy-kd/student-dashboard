@@ -3584,15 +3584,21 @@ td:first-child {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 @container taskspace (min-width: 860px) {
   .tasks-workspace-grid {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   }
+  .workspace-panel {
+    min-height: clamp(26rem, 52dvh, 34rem);
+  }
 }
 .workspace-panel {
   min-width: 0;
+  min-height: clamp(18rem, 42dvh, 26rem);
+  display: flex;
+  flex-direction: column;
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -3987,5 +3993,24 @@ td:first-child {
 @container taskspace (max-width: 459px) {
   .workspace-task-row > .grow {
     flex-basis: calc(100% - 54px);
+  }
+}
+
+/* Shared, content-expanding minimums; lists retain normal page scrolling. */
+.workspace-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  padding-block: 18px;
+}
+.workspace-empty-state .workspace-empty {
+  margin: 0;
+}
+@container taskspace (max-width: 459px) {
+  .workspace-panel {
+    min-height: clamp(14rem, 34dvh, 20rem);
   }
 }

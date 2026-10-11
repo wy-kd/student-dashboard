@@ -144,11 +144,25 @@ function WorkspaceLists() {
             </div>
             {renderTasks(lists.primary.slice(0, limit))}
             {!lists.primary.length && (
-              <p className="workspace-empty muted">
-                {filter === 'Completed'
-                  ? 'No completed tasks match this view.'
-                  : 'No outstanding tasks match this view. Change the filter or add a task.'}
-              </p>
+              <div className="workspace-empty-state">
+                <p className="workspace-empty muted">
+                  {filter === 'Completed'
+                    ? 'No completed tasks match this view.'
+                    : 'No outstanding tasks match this view. Change the filter or add a task.'}
+                </p>
+                {filter !== 'Completed' && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => {
+                      if (editor.leave()) open({ entity: 'task' });
+                    }}
+                  >
+                    <Plus size={18} />
+                    Add task
+                  </button>
+                )}
+              </div>
             )}
             {moreControls(lists.primary.length, limit, setLimit, 'tasks')}
             {filter === 'All' && (

@@ -42,6 +42,9 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.assignment-dialog-footer\{[^}]*flex-shrink:0/);
   assert.match(css, /\.quick-editor-grid\{[^}]*display:grid/);
   assert.match(css, /\.workspace-row-actions \.icon-button\{[^}]*min-width:44px/);
+  assert.match(css, /\.tasks-workspace-grid\{[^}]*align-items:stretch/);
+  assert.match(css, /min-height:clamp\(26rem,52dvh,34rem\)/);
+  assert.match(css, /min-height:clamp\(14rem,34dvh,20rem\)/);
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });
