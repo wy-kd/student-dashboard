@@ -1,3 +1,4 @@
+import { inboxAction } from './inbox-actions';
 import { z } from 'zod';
 import { todoAction, todoOrder } from './todos';
 import { db } from './db';
@@ -100,7 +101,7 @@ export async function generateOccurrences(client: any, userId: string, now: stri
 export async function productivitySnapshot(userId: string) {
   return db.$transaction(async (tx) => {
     const preference = await ensurePreferences(userId, tx);
-    const [timer, inbox, recurrences, rules, notifications, subscriptions, todos] =
+    const [timer, inbox, recurrences, rules, notifications, subscriptions, todos, inboxReview] =
       await Promise.all([
         tx.studyTimer.findUnique({ where: { activeKey: userId } }),
         tx.inboxItem.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
@@ -120,11 +121,13 @@ export async function productivitySnapshot(userId: string) {
           select: { id: true, name: true, origin: true, createdAt: true },
         }),
         tx.todoItem.findMany({ where: { userId }, orderBy: [...todoOrder] }),
+        tx.inboxReviewPreference.findUnique({ where: { userId } }),
       ]);
     return {
       preference,
       timer,
       inbox,
+      inboxReview,
       recurrences,
       rules,
       notifications,
@@ -365,6 +368,7 @@ export async function productivityAction(userId: string, b: any, now = Date.now(
   if (typeof b.action !== 'string') throw new AppError('Choose an action.');
   if (b.action.startsWith('timer.')) return timerAction(userId, b, now);
   if (b.action.startsWith('todo.')) return todoAction(userId, b);
+  if (b.action.startsWith('inbox.')) return inboxAction(userId, b, now);
   return db.$transaction(async (tx) => {
     const setting = await tx.setting.findUnique({ where: { id: 'settings' } }),
       civil = civilNow(setting?.timezone, new Date(now));
@@ -411,19 +415,6 @@ export async function productivityAction(userId: string, b: any, now = Date.now(
         }
       }
       return tx.inboxItem.create({ data: { ...(id ? { id } : {}), userId, name, createdAt: now } });
-    }
-    if (b.action === 'inbox.delete' || b.action === 'inbox.organise') {
-      const item = await tx.inboxItem.findFirst({ where: { id: idSchema.parse(b.id), userId } });
-      if (!item) throw new AppError('Capture already organised or deleted.', 409);
-      if (b.action === 'inbox.organise') {
-        const row: any = schemaFor('task').parse(
-          cleanInput('task', { ...b.task, name: b.task?.name || item.name }),
-        );
-        await validateRelations(tx, 'task', row);
-        await tx.task.create({ data: row });
-      }
-      await tx.inboxItem.delete({ where: { id: item.id } });
-      return;
     }
     if (b.action === 'recurrence.delete') {
       const series = await tx.recurrence.findFirst({

@@ -9,6 +9,7 @@ model User {
   preference Preference?
   timers StudyTimer[]
   inbox InboxItem[]
+  inboxReviewPreference InboxReviewPreference?
   todos TodoItem[]
   recurrences Recurrence[]
   rules ReminderRule[]
@@ -326,6 +327,12 @@ model InboxItem {
   userId String
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   name String
+  revision Int @default(0)
+  state String @default("pending")
+  snoozedUntil Float?
+  processedType String?
+  processedId String?
+  processedRequestId String?
   createdAt Float
 }
 model Recurrence {
@@ -530,4 +537,15 @@ model PlannedWorkBlock {
   timer        StudyTimer?    @relation(fields: [timerId], references: [id], onDelete: SetNull)
 
   @@index([userId, startAt])
+}
+
+model InboxReviewPreference {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revision Int @default(0)
+  frequency String @default("off")
+  time String @default("18:00")
+  weekday Int @default(1)
+  lastState String?
+  lastPeriod String?
 }

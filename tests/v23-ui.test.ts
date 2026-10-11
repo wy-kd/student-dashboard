@@ -6,6 +6,7 @@ import { AppContext } from '../components/context';
 import { SchedulePlanning } from '../components/SchedulePlanning';
 import { generateSchedule } from '../lib/planning-engine';
 import { instant } from '../lib/planning-time';
+import { Inbox } from '../components/Inbox';
 import { QuickAdd } from '../components/QuickAdd';
 import { QuickCapture } from '../components/QuickCapture';
 import { Editor } from '../components/Editor';
@@ -79,6 +80,7 @@ const recordRequests: any[] = [];
 let closedEditor = false,
   openedRecord: any,
   captureFailure = false;
+const conversions = new Map<string, any>();
 const captures = new Map<string, any>(),
   todos = new Map<string, any>(),
   quickRequests: any[] = [];
@@ -157,6 +159,30 @@ async function submit(form: HTMLFormElement) {
 globalThis.fetch = async (_url: any, init: any) => {
   if (_url === '/api/productivity') {
     const payload = JSON.parse(init.body);
+    if (payload.action.startsWith('inbox.')) {
+      const items = data.productivity.inbox;
+      const item = items.find((x: any) => x.id === payload.id);
+      if (payload.action === 'inbox.convert') {
+        quickRequests.push(structuredClone(payload));
+        if (!conversions.has(payload.requestId)) {
+          conversions.set(payload.requestId, payload);
+        }
+        if (captureFailure) {
+          captureFailure = false;
+          throw Error('Interrupted');
+        }
+        item.state = 'processed';
+        item.revision++;
+        item.processedType = payload.kind;
+        item.processedId = 'converted-' + payload.id;
+      } else if (payload.action === 'inbox.archive') {
+        item.state = 'archived';
+        item.revision++;
+      } else if (payload.action === 'inbox.review-preferences')
+        data.productivity.inboxReview = { ...payload.preference, revision: payload.revision + 1 };
+      else throw Error('Unexpected Inbox UI action');
+      return new Response(JSON.stringify({ ok: true }));
+    }
     if (['capture', 'todo.create'].includes(payload.action)) {
       quickRequests.push(structuredClone(payload));
       const store = payload.action === 'capture' ? captures : todos;
@@ -655,6 +681,62 @@ test('Quick Capture retains failures and retries one capture; Quick Add creates 
   assert.equal(openedRecord.entity, 'task');
   assert.equal(openedRecord.prefill.examId, 'context-exam');
   assert.equal(openedRecord.prefill.subjectId, 'creation-subject');
+});
+test('Inbox processing has separate counts, safe conversion retry and an explicit existing-record deadline editor', async () => {
+  await render(null);
+  data.productivity = {
+    inbox: [
+      {
+        id: 'review-one',
+        name: 'Assignment deadline announced',
+        createdAt: instant('2026-10-12T08:00', 'Australia/Brisbane'),
+        revision: 0,
+        state: 'pending',
+      },
+      {
+        id: 'review-two',
+        name: 'Buy notebook',
+        createdAt: instant('2026-10-12T08:10', 'Australia/Brisbane'),
+        revision: 0,
+        state: 'pending',
+      },
+    ],
+  };
+  data.assignment = [
+    { id: 'related-assignment', name: 'Report', dueAt: '2026-10-15T17:00', revision: 5 },
+  ];
+  await render(React.createElement(Inbox));
+  assert.match(document.body.textContent!, /To review \(2\)/);
+  const first = document.querySelector('.inbox-item')!;
+  await click(button('Review', first));
+  await select(first.querySelector('select')!, 'task');
+  const related = Array.from(first.querySelectorAll('select')).find((x) =>
+    x.parentElement!.textContent!.includes('Related assignment'),
+  )!;
+  await select(related, 'related-assignment');
+  const before = recordRequests.length;
+  await click(button('Review and edit deadline'));
+  assert.equal(openedRecord.entity, 'assignment');
+  assert.equal(openedRecord.row.revision, 5);
+  assert.equal(recordRequests.length, before);
+  assert.equal(data.assignment[0].dueAt, '2026-10-15T17:00');
+  captureFailure = true;
+  await submit(first.querySelector('form')!);
+  assert.ok(button('Retry same conversion'));
+  const conversion = quickRequests.at(-1);
+  await submit(first.querySelector('form')!);
+  assert.deepEqual(quickRequests.at(-1), conversion);
+  assert.equal(conversions.size, 1);
+  assert.match(document.body.textContent!, /To review \(1\)/);
+  const second = document.querySelector('.inbox-item')!;
+  await click(button('Review', second));
+  await select(second.querySelector('select')!, 'todo');
+  await submit(second.querySelector('form')!);
+  assert.equal(quickRequests.at(-1).kind, 'todo');
+  assert.ok(!quickRequests.at(-1).task);
+  assert.match(document.body.textContent!, /To review \(0\)/);
+  assert.match(document.body.textContent!, /Original capture retained/);
+  assert.match(document.body.textContent!, /Inbox review reminders · Off/);
 });
 test.after(async () => {
   await act(async () => root.unmount());

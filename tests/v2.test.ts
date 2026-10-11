@@ -561,7 +561,10 @@ test('Quick Capture organises transactionally into a linked task and cannot conv
     },
     base,
   );
-  assert.equal(await db.inboxItem.count({ where: { id: item.id } }), 0);
+  assert.equal(
+    (await db.inboxItem.findUniqueOrThrow({ where: { id: item.id } })).state,
+    'processed',
+  );
   const t = await db.task.findFirstOrThrow({ where: { name: item.name } });
   assert.equal(t.subjectId, subject.id);
   await assert.rejects(

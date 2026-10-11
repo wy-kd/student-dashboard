@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { inboxReviewSchema } from './inbox-actions';
 import { todoSchema } from './todos';
 import { z } from 'zod';
 import { AppError } from './service';
@@ -9,6 +10,7 @@ import { preferenceSchema, recurrenceSchema } from './productivity';
 export const productivityTables = [
   'preference',
   'inboxItem',
+  'inboxReviewPreference',
   'todoItem',
   'recurrence',
   'taskOccurrence',
@@ -29,7 +31,10 @@ export function parseProductivity(input: any) {
   const parsed: any = {};
   let count = 0;
   for (const name of productivityTables) {
-    const records = name === 'todoItem' && input[name] === undefined ? [] : input[name];
+    const records =
+      ['todoItem', 'inboxReviewPreference'].includes(name) && input[name] === undefined
+        ? []
+        : input[name];
     if (!Array.isArray(records)) throw new AppError('Missing V2 backup table: ' + name);
     count += records.length;
     if (count > 20000) throw new AppError('V2 backup exceeds 20,000 records.');
@@ -52,12 +57,48 @@ export function parseProductivity(input: any) {
     const schema = z.object(fields).strict(),
       ids = new Set();
     parsed[name] = records.map((raw: any) => {
-      const row: any = schema.parse(raw),
+      const compatible =
+        name === 'inboxItem'
+          ? {
+              revision: 0,
+              state: 'pending',
+              snoozedUntil: null,
+              processedType: null,
+              processedId: null,
+              processedRequestId: null,
+              ...raw,
+            }
+          : raw;
+      const row: any = schema.parse(compatible),
         id = row.id ?? row.userId;
       if (ids.has(id)) throw new AppError('Duplicate V2 backup ID.');
       ids.add(id);
       if (row.userId && row.userId !== 'owner')
         throw new AppError('V2 backup must belong to this single-owner workspace.');
+      if (name === 'inboxItem') {
+        if (
+          !['pending', 'snoozed', 'archived', 'processed'].includes(row.state) ||
+          row.revision < 0 ||
+          !row.name.trim() ||
+          row.name.length > 500 ||
+          row.createdAt < 0 ||
+          (row.snoozedUntil !== null && row.snoozedUntil < 0)
+        )
+          throw new AppError('Invalid Inbox capture in backup.');
+        if (row.state === 'snoozed' && row.snoozedUntil === null)
+          throw new AppError('Snoozed capture is missing a review time.');
+        if (
+          row.state === 'processed' &&
+          (!['task', 'todo'].includes(row.processedType) || !row.processedId)
+        )
+          throw new AppError('Converted capture is missing provenance.');
+        row.revision++;
+      }
+      if (name === 'inboxReviewPreference') {
+        inboxReviewSchema.parse({ frequency: row.frequency, time: row.time, weekday: row.weekday });
+        if (row.revision < 0) throw new AppError('Invalid Inbox review revision.');
+        row.revision++;
+      }
       if (name === 'todoItem') {
         todoSchema.parse({ name: row.name, dueDate: row.dueDate });
         if (row.position < 0 || row.revision < 0)

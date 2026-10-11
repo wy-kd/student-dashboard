@@ -4339,3 +4339,31 @@ td:first-child {
     max-height: calc(100dvh - 32px - env(safe-area-inset-bottom));
   }
 }
+.inbox-summary {
+  display: flex;
+  align-items: start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.inbox-summary .grow {
+  min-width: min(100%, 220px);
+  overflow-wrap: anywhere;
+}
+.inbox-summary .muted {
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+.inbox-review {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.inbox-review form {
+  display: grid;
+  gap: 12px;
+}
+.inbox-item button {
+  min-height: 44px;
+}

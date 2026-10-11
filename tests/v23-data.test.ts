@@ -37,7 +37,9 @@ test('Additive migration preserves a populated V2.2.1 database including credent
     const names = readdirSync(resolve('prisma/migrations'))
       .filter((x) => /^\d/.test(x))
       .sort();
-    for (const name of names.filter((x) => !x.includes('v23_planning')))
+    for (const name of names.filter(
+      (x) => !x.includes('v23_planning') && !x.includes('v231_inbox'),
+    ))
       sql.exec(readFileSync(resolve('prisma/migrations', name, 'migration.sql'), 'utf8'));
     sql.exec(`INSERT INTO User(id,passwordHash) VALUES('owner','fixture-hash');
       INSERT INTO Session(id,expiresAt,userId) VALUES('fixture-session',123456789,'owner');

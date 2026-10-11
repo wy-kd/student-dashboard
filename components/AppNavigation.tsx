@@ -1,4 +1,6 @@
 'use client';
+import { actionableInbox } from '@/lib/inbox-state';
+import { instant } from '@/lib/planning-time';
 import { useApp } from './context';
 import {
   LayoutDashboard,
@@ -51,7 +53,7 @@ export function AppSidebar({
   toggleSidebar: () => void;
   onSignOut: () => void;
 }) {
-  const { allData, data, go } = useApp();
+  const { allData, data, go, now } = useApp();
   return (
     <aside className={'sidebar ' + (menu ? 'open' : '')}>
       <button className="brand" aria-label="Dashboard" onClick={() => go('/')}>
@@ -90,6 +92,16 @@ export function AppSidebar({
           >
             <Icon size={19} />
             <span>{label}</span>
+            {url === 'inbox' && (
+              <small aria-label="Captures needing review">
+                {
+                  actionableInbox(
+                    allData.productivity?.inbox ?? [],
+                    instant(now, allData.setting.timezone),
+                  ).length
+                }
+              </small>
+            )}
             {url === 'tasks' && (
               <small>{data.task.filter((t) => t.status !== 'Completed').length}</small>
             )}

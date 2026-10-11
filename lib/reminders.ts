@@ -1,3 +1,5 @@
+import { actionableInbox } from './inbox-state';
+import { weekday } from './civil';
 import { formatDateTime } from './format';
 import { createHash } from 'node:crypto';
 import { db } from './db';
@@ -150,6 +152,42 @@ export async function reconcileReminders(userId: string, now = Date.now()) {
             },
             update: {},
           });
+      }
+      const review = await tx.inboxReviewPreference.findUnique({ where: { userId } });
+      if (
+        review &&
+        review.frequency !== 'off' &&
+        civil.slice(11, 16) >= review.time &&
+        (review.frequency !== 'weekly' || weekday(today) === review.weekday) &&
+        !isQuiet(civil, p.quietStart, p.quietEnd)
+      ) {
+        const items = actionableInbox(await tx.inboxItem.findMany({ where: { userId } }), now);
+        const state = createHash('sha256')
+          .update(
+            items
+              .map((x) => `${x.id}:${x.revision}`)
+              .sort()
+              .join('|'),
+          )
+          .digest('hex');
+        if (items.length && state !== review.lastState && today !== review.lastPeriod) {
+          await tx.notification.upsert({
+            where: { dedupeKey: userId + ':inbox-review:' + state },
+            create: {
+              userId,
+              dedupeKey: userId + ':inbox-review:' + state,
+              category: 'System',
+              title: 'Review your Inbox',
+              message: `${items.length} captured ${items.length === 1 ? 'item needs' : 'items need'} review. Open Inbox when you have a moment.`,
+              createdAt: now,
+            },
+            update: {},
+          });
+          await tx.inboxReviewPreference.update({
+            where: { userId },
+            data: { lastState: state, lastPeriod: today },
+          });
+        }
       }
       // Retain at most 100 current notifications and 30 days of history. Reminder tombstones
       // remain for active records so cleanup cannot resurrect the same reminder.

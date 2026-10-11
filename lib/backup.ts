@@ -108,6 +108,15 @@ export async function restoreBackup(input: any) {
           if (old) row.revision = Math.max(row.revision, old.revision + 1);
         }
       }
+      for (const name of ['inboxItem', 'inboxReviewPreference'] as const) {
+        if (extra?.[name]) {
+          const existing = await c[name].findMany();
+          for (const row of extra[name]) {
+            const old = existing.find((x: any) => (x.id ?? x.userId) === (row.id ?? row.userId));
+            if (old) row.revision = Math.max(row.revision, old.revision + 1);
+          }
+        }
+      }
       const previousPlanning = await exportPlanning(tx);
       await clearPlanning(tx);
       await clearProductivity(tx);
