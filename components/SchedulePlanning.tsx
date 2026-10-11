@@ -13,6 +13,8 @@ import {
 } from '@/lib/planning-engine';
 import { requestPlanning } from '@/lib/planning-client';
 import { formatTimestamp } from '@/lib/format';
+import { scheduleIssues } from '@/lib/planning-disruptions';
+import { PlannedWorkReview, PlannedWorkEditor } from './PlannedWork';
 type Preview = ScheduleProposal & { fingerprint: string };
 type Draft = SuggestedBlock & { selected: boolean; start: string; end: string; locked: boolean };
 const draftFor = (block: SuggestedBlock, zone: string): Draft => ({
@@ -33,21 +35,39 @@ export function SchedulePlanning() {
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [excluded, setExcluded] = useState<string[]>([]),
-    [uncertain, setUncertain] = useState(false);
+    [uncertain, setUncertain] = useState(false),
+    [adjustmentId, setAdjustmentId] = useState<string | null>(null),
+    [kept, setKept] = useState<string[]>([]),
+    [recordBlock, setRecordBlock] = useState<any>(null),
+    [editBlock, setEditBlock] = useState<string | null>(null);
   const pending = useRef<any>(null),
-    allWork = workItems(scoped, Date.now()).items;
-  async function generate(startDate = range.startDate, endDate = range.endDate) {
+    allWork = workItems(scoped, Date.now()).items,
+    scopedIds = new Set((scoped.planning?.blocks ?? []).map((b) => b.id)),
+    issues = scheduleIssues(d, instant(now, zone)).filter(
+      (issue) => scopedIds.has(issue.block.id) && !kept.includes(issue.key),
+    );
+  async function generate(
+    startDate = range.startDate,
+    endDate = range.endDate,
+    moveId: string | null = null,
+  ) {
     if (busy || uncertain) return;
     setBusy(true);
     setError('');
     setMessage('');
     try {
-      const p = await requestPlanning('schedule.generate', {
-        startDate,
-        endDate,
-        excluded,
-        semesterId: scoped.setting.activeSemesterId,
-      });
+      const p = await requestPlanning(
+        moveId ? 'schedule.adjust' : 'schedule.generate',
+        moveId
+          ? { id: moveId, startDate, endDate }
+          : {
+              startDate,
+              endDate,
+              excluded,
+              semesterId: scoped.setting.activeSemesterId,
+            },
+      );
+      setAdjustmentId(moveId);
       setRange({ startDate, endDate });
       setPreview(p);
       setRows(p.suggestions.map((b: SuggestedBlock) => draftFor(b, zone)));
@@ -133,12 +153,111 @@ export function SchedulePlanning() {
       setBusy(false);
     }
   }
+  async function dismiss(id: string, revision: number) {
+    if (
+      busy ||
+      uncertain ||
+      !confirm(
+        'Dismiss this planned allocation? Existing Tasks and recorded study history are preserved.',
+      )
+    )
+      return;
+    setBusy(true);
+    setError('');
+    try {
+      await requestPlanning('block.dismiss', { id, revision });
+      await reload();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Section
       title="Plan your study"
       sub="Availability-aware suggestions. Nothing changes until you approve selected work."
     >
       <div className="planning-workspace">
+        {issues.length > 0 && (
+          <div className="planning-review" aria-label="Recorded schedule changes">
+            <h3>Plans needing review</h3>
+            <p className="muted">
+              These prompts reflect recorded changes. No plan has been moved, marked failed or
+              completed automatically.
+            </p>
+            {issues.slice(0, 50).map((issue) => (
+              <div className="planning-suggestion" key={issue.key}>
+                <strong>{issue.block.name}</strong>
+                <p className="muted">
+                  {formatTimestamp(issue.block.startAt, zone)} –{' '}
+                  {formatTimestamp(issue.block.endAt, zone)}
+                </p>
+                {issue.reasons.map((reason, i) => (
+                  <p key={i}>{reason}</p>
+                ))}
+                {issue.active && (
+                  <p>Use End and the existing timer review before changing this plan.</p>
+                )}
+                {issue.block.locked && (
+                  <p>
+                    This session is fixed. Unlock it explicitly in confirmed planned work to request
+                    a move.
+                  </p>
+                )}
+                <div className="inline">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy || uncertain || issue.active}
+                    onClick={() => setRecordBlock(issue.block)}
+                  >
+                    Record what I completed
+                  </button>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy || uncertain || !issue.canSuggest}
+                    onClick={() => generate(today, addDays(today, 6), issue.block.id)}
+                  >
+                    Review alternative times
+                  </button>
+                  {!issue.canSuggest && !issue.block.locked && !issue.active && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={busy || uncertain}
+                      onClick={() => setEditBlock(issue.block.id)}
+                    >
+                      Review work association
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy || uncertain}
+                    onClick={() => setKept([...kept, issue.key])}
+                  >
+                    Keep current plan
+                  </button>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy || uncertain || issue.active}
+                    onClick={() => dismiss(issue.block.id, issue.block.revision)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+            {issues.length > 50 && (
+              <p>
+                {issues.length - 50} more plans need review. Review these, then reload to continue.
+              </p>
+            )}
+          </div>
+        )}
         <div className="inline">
           <button
             type="button"
@@ -426,6 +545,7 @@ export function SchedulePlanning() {
                 onClick={() => {
                   setPreview(null);
                   setRows([]);
+                  setAdjustmentId(null);
                   pending.current = null;
                   setError('');
                 }}
@@ -436,7 +556,7 @@ export function SchedulePlanning() {
                 type="button"
                 className="button secondary"
                 disabled={busy || uncertain}
-                onClick={() => generate()}
+                onClick={() => generate(range.startDate, range.endDate, adjustmentId)}
               >
                 Regenerate suggestions
               </button>
@@ -481,6 +601,8 @@ export function SchedulePlanning() {
           </details>
         )}
       </div>
+      {recordBlock && <PlannedWorkReview block={recordBlock} close={() => setRecordBlock(null)} />}
+      {editBlock && <PlannedWorkEditor id={editBlock} close={() => setEditBlock(null)} />}
     </Section>
   );
 }

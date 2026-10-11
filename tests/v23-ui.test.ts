@@ -146,6 +146,35 @@ globalThis.fetch = async (_url: any, init: any) => {
     data.planning!.exceptions = value.exceptions;
     return new Response(JSON.stringify({ result: data.planning!.preference }));
   }
+  if (action === 'schedule.adjust') {
+    const block = data.planning!.blocks.find((b) => b.id === payload.id)!;
+    return new Response(
+      JSON.stringify({
+        result: {
+          fingerprint: 'a'.repeat(64),
+          ...generateSchedule(
+            data,
+            instant('2026-10-12T09:00', 'Australia/Brisbane'),
+            payload.startDate,
+            payload.endDate,
+          ),
+          suggestions: [
+            {
+              id: 'move-' + block.id,
+              moveId: block.id,
+              revision: block.revision,
+              name: block.name,
+              workKey: block.workKey,
+              startAt: instant('2026-10-12T14:00', 'Australia/Brisbane'),
+              endAt: instant('2026-10-12T14:30', 'Australia/Brisbane'),
+              override: false,
+              reason: 'Move the existing reservation; current plan unchanged until approved.',
+            },
+          ],
+        },
+      }),
+    );
+  }
   if (action === 'schedule.generate')
     return new Response(
       JSON.stringify({
@@ -168,14 +197,22 @@ globalThis.fetch = async (_url: any, init: any) => {
       approvalWrites++;
       receipt = { batchId: payload.requestId, state: 'approved' };
       approved.set(payload.requestId, receipt);
-      data.planning!.blocks.push(
-        ...payload.changes.map((change: any) => ({
-          ...change,
-          id: payload.requestId + ':' + change.id,
-          state: 'planned',
-          revision: 0,
-        })),
-      );
+      for (const change of payload.changes) {
+        if (change.moveId) {
+          const block = data.planning!.blocks.find((b) => b.id === change.moveId)!;
+          Object.assign(block, {
+            startAt: change.startAt,
+            endAt: change.endAt,
+            revision: block.revision + 1,
+          });
+        } else
+          data.planning!.blocks.push({
+            ...change,
+            id: payload.requestId + ':' + change.id,
+            state: 'planned',
+            revision: 0,
+          });
+      }
     }
     if (interruptApproval) {
       interruptApproval = false;
@@ -351,6 +388,38 @@ test('Today and Timetable render confirmed plans and appointments; Calendar sele
   await click(button('Close', document.querySelector('dialog')!));
   assert.ok(!document.querySelector('dialog'));
   assert.equal(data.studySession.length, 0, 'viewing/starting from Calendar does not record work');
+});
+test('Past-plan review is neutral; Keep and Cancel do not write and an accepted alternative moves only the selected reservation', async () => {
+  await render(null);
+  const block = {
+    ...data.planning!.blocks[0],
+    id: 'past-plan',
+    startAt: instant('2026-10-12T08:00', 'Australia/Brisbane'),
+    endAt: instant('2026-10-12T08:30', 'Australia/Brisbane'),
+    revision: 0,
+  };
+  data.planning!.blocks = [block];
+  data.planning!.commitments = [];
+  const before = approvalWrites;
+  await render(React.createElement(SchedulePlanning));
+  assert.match(document.body.textContent!, /hasn't been confirmed/);
+  await click(button('Keep current plan'));
+  assert.ok(!document.querySelector('[aria-label="Recorded schedule changes"]'));
+  assert.equal(approvalWrites, before);
+  assert.equal(block.startAt, instant('2026-10-12T08:00', 'Australia/Brisbane'));
+  await render(null);
+  await render(React.createElement(SchedulePlanning));
+  await click(button('Review alternative times'));
+  assert.match(document.body.textContent!, /Proposed move/);
+  await click(button('Cancel proposal'));
+  assert.equal(approvalWrites, before);
+  assert.equal(block.startAt, instant('2026-10-12T08:00', 'Australia/Brisbane'));
+  await click(button('Review alternative times'));
+  await click(button('Accept selected changes'));
+  assert.equal(approvalWrites, before + 1);
+  assert.equal(data.planning!.blocks.length, 1);
+  assert.equal(block.startAt, instant('2026-10-12T14:00', 'Australia/Brisbane'));
+  assert.equal(data.studySession.length, 0);
 });
 test.after(async () => {
   await act(async () => root.unmount());

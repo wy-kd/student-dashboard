@@ -9,6 +9,8 @@ import { defaults } from '../lib/model';
 import { calendarEvents } from '../lib/calculations';
 import { todayPlanning } from '../lib/planning-view';
 import { workItems } from '../lib/planning-engine';
+import { scheduleIssues } from '../lib/planning-disruptions';
+import { suggestAdjustment } from '../lib/planning-adjustments';
 import { instant, minute } from '../lib/planning-time';
 const dir = mkdtempSync(join(tmpdir(), 'student-v23-integration-'));
 process.env.DATABASE_URL = 'file:' + join(dir, 'test.db');
@@ -36,6 +38,8 @@ test.before(async () => {
     });
 });
 test.beforeEach(async () => {
+  await db.commitment.deleteMany();
+  await db.availabilityException.deleteMany();
   await db.plannedWorkBlock.deleteMany();
   await db.scheduleBatch.deleteMany();
   await db.studyTimer.deleteMany();
@@ -314,6 +318,140 @@ test('Source completion prevents starting an obsolete plan and semester generati
   } finally {
     Date.now = realNow;
   }
+});
+test('Recorded appointments produce unsaved guarded alternatives; only approval moves the existing reservation', async () => {
+  const appointment = await db.commitment.create({
+    data: {
+      userId: 'owner',
+      name: 'New recorded appointment',
+      startAt: stamp('10:30'),
+      endAt: stamp('11:30'),
+    },
+  });
+  let d = await snapshot();
+  assert.match(scheduleIssues(d, stamp('08:00'))[0].reasons.join(' '), /recorded appointment/i);
+  const proposal = suggestAdjustment(d, stamp('08:00'), block.id, date, '2026-10-18');
+  assert.equal(proposal.suggestions.length, 1);
+  assert.equal(proposal.suggestions[0].moveId, block.id);
+  assert.equal(
+    (await db.plannedWorkBlock.findUnique({ where: { id: block.id } }))!.startAt,
+    stamp('10:00'),
+  );
+  assert.equal(await db.studySession.count(), 0);
+  const request = {
+    requestId: randomUUID(),
+    fingerprint: planningFingerprint(d),
+    changes: proposal.suggestions,
+  };
+  await db.task.update({
+    where: { id: task.id },
+    data: { dueAt: date + 'T17:00', revision: { increment: 1 } },
+  });
+  await assert.rejects(approveSchedule('owner', request, stamp('08:00')), /changed while/);
+  d = await snapshot();
+  const fresh = {
+    requestId: randomUUID(),
+    fingerprint: planningFingerprint(d),
+    changes: suggestAdjustment(d, stamp('08:00'), block.id, date, '2026-10-18').suggestions,
+  };
+  await approveSchedule('owner', fresh, stamp('08:00'));
+  await approveSchedule('owner', fresh, stamp('08:00'));
+  assert.equal(await db.plannedWorkBlock.count(), 1);
+  assert.equal(await db.studySession.count(), 0);
+  assert.equal(
+    (await db.commitment.findUnique({ where: { id: appointment.id } }))!.startAt,
+    stamp('10:30'),
+  );
+  assert.equal(scheduleIssues(await snapshot(), stamp('08:00')).length, 0);
+});
+test('Availability exceptions and changed deadlines explain gaps; completed work and fixed/active plans are never automatically moved', async () => {
+  await db.availabilityException.create({ data: { userId: 'owner', date, windows: '[]' } });
+  let d = await snapshot();
+  assert.match(
+    scheduleIssues(d, stamp('08:00'))[0].reasons.join(' '),
+    /outside current recorded availability/,
+  );
+  let p = suggestAdjustment(d, stamp('08:00'), block.id, date, '2026-10-18');
+  assert.equal(p.suggestions.length, 0);
+  assert.equal(p.status, 'Needs adjustment');
+  assert.ok(p.unscheduled[0].reason);
+  await db.availabilityException.deleteMany();
+  await db.task.update({ where: { id: task.id }, data: { dueAt: date + 'T10:30' } });
+  d = await snapshot();
+  assert.match(scheduleIssues(d, stamp('08:00'))[0].reasons.join(' '), /effective.*deadline/);
+  p = suggestAdjustment(d, stamp('08:00'), block.id, date, date);
+  assert.ok(p.suggestions[0].endAt <= stamp('10:30'));
+  await db.plannedWorkBlock.update({ where: { id: block.id }, data: { locked: true } });
+  assert.throws(
+    () =>
+      suggestAdjustment(
+        { ...d, planning: { ...d.planning!, blocks: [{ ...block, locked: true }] } },
+        stamp('08:00'),
+        block.id,
+        date,
+        date,
+      ),
+    /fixed/,
+  );
+  await db.task.update({ where: { id: task.id }, data: { status: 'Completed' } });
+  d = await snapshot();
+  assert.equal(scheduleIssues(d, stamp('08:00'))[0].canSuggest, false);
+  assert.equal(
+    (await db.plannedWorkBlock.findUnique({ where: { id: block.id } }))!.startAt,
+    stamp('10:00'),
+  );
+  assert.equal(await db.studySession.count(), 0);
+});
+test('Past unconfirmed plans stay neutral; keeping detection has no writes and explicit dismissal preserves all academic data', async () => {
+  const d = await snapshot(),
+    issues = scheduleIssues(d, stamp('12:00'));
+  assert.equal(issues[0].unconfirmed, true);
+  assert.match(issues[0].reasons.join(' '), /hasn't been confirmed/);
+  assert.doesNotMatch(issues[0].reasons.join(' '), /failed|missed work/);
+  assert.equal((await db.task.findUnique({ where: { id: task.id } }))!.status, 'Not Started');
+  assert.equal(await db.studySession.count(), 0);
+  await dismissBlock('owner', { id: block.id, revision: block.revision });
+  assert.equal(scheduleIssues(await snapshot(), stamp('12:00')).length, 0);
+  assert.equal(await db.task.count(), 1);
+  assert.equal(await db.studySession.count(), 0);
+});
+test('Active plan timers block adjustment proposals and recorded manual moves are reflected in occupied-time checks', async () => {
+  const timer = await start(),
+    d = await snapshot();
+  d.productivity = await productivitySnapshot('owner');
+  await assert.rejects(
+    planningAction('owner', {
+      action: 'schedule.adjust',
+      data: { id: block.id, startDate: date, endDate: date },
+    }),
+    /active timer/,
+  );
+  assert.throws(() => suggestAdjustment(d, stamp('12:00'), block.id, date, date), /active timer/);
+  const issues = scheduleIssues(d, stamp('12:00'));
+  assert.ok(
+    !issues.some(
+      (i) => i.unconfirmed && i.reasons.some((r) => r.includes("hasn't been confirmed")),
+    ),
+  );
+  await timerAction(
+    'owner',
+    { action: 'timer.cancel', id: timer.id, revision: timer.revision },
+    stamp('12:00'),
+  );
+  await db.plannedWorkBlock.create({
+    data: {
+      userId: 'owner',
+      name: 'Moved reservation',
+      startAt: stamp('10:45'),
+      endAt: stamp('11:45'),
+      state: 'planned',
+      origin: 'manual',
+    },
+  });
+  assert.match(
+    scheduleIssues(await snapshot(), stamp('08:00'))[0].reasons.join(' '),
+    /Moved reservation/,
+  );
 });
 test.after(async () => {
   await db.$disconnect();

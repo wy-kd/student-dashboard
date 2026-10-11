@@ -5,6 +5,7 @@ import { generateSchedule, workItems } from './planning-engine';
 import { planningFingerprint, approveSchedule, undoSchedule } from './planning-approval';
 import { availabilitySchema } from './planning-model';
 import { civilRange, instant } from './planning-time';
+import { suggestAdjustment } from './planning-adjustments';
 const revisionSchema = z.number().int().nonnegative();
 export async function saveAvailability(userId: string, input: unknown) {
   const value = availabilitySchema.parse(input);
@@ -81,6 +82,25 @@ export async function deleteCommitment(userId: string, input: unknown) {
   });
 }
 export async function planningAction(userId: string, b: any) {
+  if (b.action === 'schedule.adjust') {
+    const value = z
+      .object({ id: z.string(), startDate: z.string(), endDate: z.string() })
+      .strict()
+      .parse(b.data);
+    const d = await snapshot();
+    d.productivity = {
+      timer: await db.studyTimer.findFirst({
+        where: { userId, activeKey: userId },
+        select: { id: true },
+      }),
+    };
+    if (!d.planning?.blocks.some((block) => block.id === value.id && block.userId === userId))
+      throw new AppError('This planned session no longer exists.', 404);
+    return {
+      fingerprint: planningFingerprint(d),
+      ...suggestAdjustment(d, Date.now(), value.id, value.startDate, value.endDate),
+    };
+  }
   if (b.action === 'block.context') return blockContext(userId, b.data);
   if (b.action === 'block.record') return recordPlannedWork(userId, b.data);
   if (b.action === 'block.lock') return setBlockLock(userId, b.data);
