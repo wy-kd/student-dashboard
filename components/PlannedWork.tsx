@@ -384,10 +384,7 @@ export function PlannedWorkReview({ block, close }: { block: any; close: () => v
     >
       <header className="assignment-dialog-header">
         <h2 id="planned-review-heading">Review actual work</h2>
-        <p>
-          {block.name} · {((block.endAt - block.startAt) / 3600000).toFixed(1)}h intended. Enter
-          only the work you actually did.
-        </p>
+        <p>Enter only the work you actually did.</p>
       </header>
       <form
         onSubmit={async (e) => {
@@ -443,6 +440,10 @@ export function PlannedWorkReview({ block, close }: { block: any; close: () => v
         }}
       >
         <div className="assignment-dialog-body">
+          <p className="planned-review-title">
+            <strong>{block.name}</strong> · {((block.endAt - block.startAt) / 3600000).toFixed(1)}h
+            intended.
+          </p>
           <fieldset className="availability-fieldset" disabled={busy || uncertain}>
             <label className="field">
               Actual start

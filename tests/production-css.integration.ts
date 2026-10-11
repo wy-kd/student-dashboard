@@ -45,6 +45,19 @@ test('production CSS contains current navigation, timer and recurring editor lay
   assert.match(css, /\.tasks-workspace-grid\{[^}]*align-items:stretch/);
   assert.match(css, /min-height:clamp\(26rem,52dvh,34rem\)/);
   assert.match(css, /min-height:clamp\(14rem,34dvh,20rem\)/);
+  assert.match(
+    css,
+    /\.availability-days\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,310px\),1fr\)\)/,
+  );
+  assert.match(css, /\.planning-preview-list\{[^}]*display:grid/);
+  assert.match(css, /\.planned-work-actions\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.planned-work-actions button\{[^}]*min-height:44px/);
+  assert.match(css, /\.planned-work-editor>form\{[^}]*min-height:0/);
+  assert.match(css, /\.planned-work-editor \.assignment-dialog-body\{[^}]*overflow-y:auto/);
+  assert.match(
+    css,
+    /\.planning-suggestion \.form-grid\{[^}]*grid-template-columns:minmax\(0,1fr\)/,
+  );
   assert.doesNotMatch(css, /mini-timer-cancel/);
   assert.doesNotMatch(css, /fullscreen-controls|fullscreen-enter|distraction-free/);
 });

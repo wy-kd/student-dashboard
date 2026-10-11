@@ -45,6 +45,9 @@ test(
     mkdirSync(join(root, 'data'));
     mkdirSync(join(root, 'backups'));
     const databaseUrl = 'file:' + join(root, 'data/student.db');
+    // Only this empty disposable fixture: avoid the schema engine's first-file creation
+    // path in restricted test environments. Real migrate deploy still creates all tables.
+    new DatabaseSync(join(root, 'data/student.db')).close();
     writeFileSync(join(root, '.env'), `DATABASE_URL=${JSON.stringify(databaseUrl)}\n`);
     writeFileSync(join(root, 'data/setup-token'), 'fixture-setup-token-SECRET');
     writeFileSync(join(root, 'backups/keep.json'), 'existing backup');

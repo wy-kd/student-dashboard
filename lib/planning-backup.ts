@@ -65,6 +65,8 @@ export function parsePlanning(input: any) {
           throw new AppError('Invalid planning interval.');
       }
       if (name === 'plannedWorkBlock') {
+        if (row.workKey != null && !/^(task|assignment|exam):[^:]+$/.test(row.workKey))
+          throw new AppError('Invalid planned work key.');
         if (
           !['planned', 'reviewed', 'dismissed'].includes(row.state) ||
           !['manual', 'suggested'].includes(row.origin)
@@ -125,11 +127,9 @@ export async function restorePlanning(client: any, parsed: any, previous: any) {
       }
       if (name === 'plannedWorkBlock' && row.taskId) {
         const task = await client.task.findUnique({ where: { id: row.taskId } });
-        if (
-          !task ||
-          (row.assignmentId && row.assignmentId !== task.assignmentId) ||
-          (row.examId && row.examId !== task.examId)
-        )
+        // A legitimately reassociated Task may leave an older intention awaiting review.
+        // Preserve that original context; approval/start still require fresh matching links.
+        if (!task || (row.workKey != null && row.workKey !== 'task:' + row.taskId))
           throw new AppError('Invalid planning task relationship.');
       }
       await client[name].create({ data: row });

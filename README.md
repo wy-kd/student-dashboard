@@ -1,6 +1,6 @@
 # Student Dashboard
 
-Current release: **V2.2.1 — Tasks Workspace & Assignment Dialog Polish**. See the [backup-first Acer update, recovery and device guide](docs/V2.2.1-GUIDE.md).
+Current release: **V2.3 — Basic Time Management & Scheduling**. See the [backup-first Acer update, recovery and device guide](docs/V2.3-GUIDE.md).
 
 Updating from V1? Read the [safe V2 update guide](docs/V2-GUIDE.md#apply-v2-safely-on-the-acer) before pulling and installing.
 
@@ -386,9 +386,9 @@ An assessment's tasks, topics, milestones and sessions are managed from its deta
 - **Revision progress:** Not Started = 0, Learning = 33, Revising = 67, Confident = 100; average across topics. With no topics, manual revision progress applies. Completed exams show 100%.
 - **Remaining work:** maximum of assessment estimate × incomplete progress and remaining estimates on its incomplete tasks. Actual session time is a separate measurement, not automatic proof of completion. Update task/topic status as you finish work.
 - **Logged assessment time:** assignment manual hours plus linked study-session actual hours. Do not enter the same hours both ways. Task actual hours are tracked separately and are not added again to that total.
-- **Schedule health:** overdue assessments or missed milestones are Behind. Work exceeding available daily capacity or far below elapsed progress is At Risk. Progress ahead of elapsed time, or an early completed milestone while on pace, is Ahead. Otherwise On Track. This is a planning heuristic, not a grade prediction.
+- **Schedule health:** overdue assessments or missed milestones are Behind. Work exceeding the configured daily study target or far below elapsed progress is At Risk. Progress ahead of elapsed time, or an early completed milestone while on pace, is Ahead. Otherwise On Track. This legacy heuristic uses a target, not exact availability; V2.3's scheduling proposals use recorded free periods separately.
 - **Priority:** urgency + 0.2 × weighting + 0.1 × incomplete percentage + capped daily work pressure + difficulty + overdue-task penalty. Exams use confidence to estimate difficulty. The Analytics page shows each contribution. Manual priority is an additional personal label and does not secretly change this formula.
-- **Forecast:** distributes remaining work for deadlines inside the selected horizon across days up to each deadline. Includes overdue work on day one and standalone dated tasks, avoids double-counting linked task hours. It does not allocate preparation for exams beyond the forecast horizon or optimise class/study-session free slots. Three assessments in a seven-day block or work beyond configured capacity triggers a collision warning.
+- **Forecast:** retains the legacy target-based workload forecast and collision warnings. It does not optimise actual free intervals. Use V2.3's Plan your study controls for availability-aware, deadline-constrained proposals requiring approval.
 - **Grades:** contribution = score / maximum × weighting. Current grade = earned contribution / marked weighting × 100. Required average on remaining work = (target − earned contribution) / (100 − marked weighting) × 100. Values over 100 are “Not achievable”. No rounding occurs before the final display calculation. Subject assessment weightings cannot exceed 100%; missing weighting is clearly flagged.
 - **Semester:** elapsed percentage is bounded to 0–100%. Teaching weeks start on the configured teaching-start date and skip Break records covering a weekly boundary. Use full Monday–Sunday breaks with a Monday teaching-start date. Arbitrary partial-week holidays suppress classes but do not decrement the teaching-week counter.
 - **Multi-device:** each visible page refreshes every 15 seconds and on focus. Editing a record with an older revision returns a refresh error instead of overwriting another device’s changes. The app is designed for one user; settings edits use last-write-wins.
@@ -398,7 +398,7 @@ An assessment's tasks, topics, milestones and sessions are managed from its deta
 
 ### Recommended: portable JSON
 
-In **Settings → Backups & data export**, download a JSON backup. Copy it to another drive or a location you control. It includes academic tables and preferences, but **not** your password or sessions. It is unencrypted, so protect it like your academic records.
+In **Settings → Backups & data export**, download a JSON backup. Copy it to another drive or a location you control. Version 3 includes academic/productivity records, preferences and all seven scheduling tables, but **not** your password or authentication sessions. V1/V2 imports remain supported; an older restore clears later scheduling state. It is unencrypted, so protect it like your academic records.
 
 **Create local backup** saves a dated JSON file in `backups/`. This helps recover accidental edits but will not protect against losing the laptop unless you copy the file elsewhere.
 
@@ -437,6 +437,8 @@ Use **Settings → Add demo data**, or run `npm run db:seed`. Demo dates are rel
 ## Updating
 
 For an installation using automatic startup, use this order. Run each command separately; **stop if any step fails**.
+
+For the V2.2.1 → V2.3 update, follow the [V2.3 guide](docs/V2.3-GUIDE.md) first. It includes timestamped full-data/environment/JSON backups, count/hash verification, lifecycle validation and paired source/database rollback for the new additive migration.
 
 1. While the app is still running, download a JSON backup through **Settings → Backups & data export**, then copy it somewhere separate from the laptop if possible.
 2. In your repository's Command Prompt, disable automatic startup and stop safely:
@@ -611,3 +613,11 @@ Edit common Task or To-do fields directly inside their rows. One quick editor is
 Assignment-created and breakdown dialogs share consistent spacing and controls. The actual assignment is clearly labelled. Breakdown has a scrolling body and separate footer, valid-selection Save gating and quieter progress help; all V2.2 templates/drafts/retries remain. No migration, backend API, production dependency or infrastructure change. A pinned development-only jsdom dependency supports interaction regression tests.
 
 Use the [V2.2.1 guide](docs/V2.2.1-GUIDE.md) for detailed behaviour, exact backup/count/hash verification, Acer update commands, separate JSON/full database/environment recovery and physical acceptance checks. Spotify remains outside this release.
+
+## V2.3 Basic Time Management & Scheduling
+
+Tasks panels now stretch equally in wide layouts, retain shared responsive minimum heights when empty and grow naturally with page scrolling. Scheduling remains optional: configure weekly availability/date exceptions and appointments in Settings, then review Plan your study proposals on Today or Study. Existing Tasks and their effective assessment deadlines drive deterministic, local suggestions with session/rest/daily limits, explicit remaining estimates, conflicts and shortfalls.
+
+Preview edits, selective approval, guarded retries and safe undo never silently replace confirmed plans or mark work complete. Confirmed work appears in Today/Calendar/Timetable and links to existing Tasks/assessments/timer review. Intended and actual hours remain separate; recorded changes produce reviewable alternatives and neutral past-session prompts. No second timer or calendar store is introduced.
+
+One create-only migration adds seven scheduling tables; V3 JSON backs them up and V1/V2 restore remains supported. No dependency, authentication, reminder, Web Push, recurring Task, PWA, Windows or Tailscale infrastructure change is made. Use the [V2.3 usage, backup-first Acer update and recovery guide](docs/V2.3-GUIDE.md) and [staged architecture/validation record](docs/V2.3-ARCHITECTURE.md). Spotify and external integrations remain outside this release.

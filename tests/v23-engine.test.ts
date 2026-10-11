@@ -43,6 +43,34 @@ function task(id: string, hours: number, extra: any = {}) {
     ...extra,
   };
 }
+test('Generated rest intervals span separate free windows and short fixed appointments', () => {
+  for (const appointment of [true, false]) {
+    const d = fixture();
+    d.setting.dailyHours = 8;
+    d.planning!.preference.maxDailyMinutes = null;
+    d.task = [task('Rest boundary', 3, { dueAt: '2026-10-12T12:00' })];
+    d.planning!.windows = appointment
+      ? [{ day: 1, startTime: '09:00', endTime: '12:00' }]
+      : [
+          { day: 1, startTime: '09:00', endTime: '10:00' },
+          { day: 1, startTime: '10:05', endTime: '12:00' },
+        ];
+    if (appointment)
+      d.planning!.commitments = [
+        {
+          id: 'short',
+          name: 'Five-minute appointment',
+          startAt: instant('2026-10-12T10:00', zone),
+          endAt: instant('2026-10-12T10:05', zone),
+          fixed: true,
+        },
+      ];
+    const p = generateSchedule(d, now, '2026-10-12', '2026-10-12');
+    assert.ok(p.suggestions.length >= 2);
+    for (let i = 1; i < p.suggestions.length; i++)
+      assert.ok(p.suggestions[i].startAt >= p.suggestions[i - 1].endAt + 10 * minute);
+  }
+});
 test('Seven-day plans are deterministic, split tasks, distribute workload and reserve rest without duplicating work', () => {
   const d = fixture();
   d.task = [task('Report', 5, { dueAt: '2026-10-16T11:00' })];

@@ -279,7 +279,14 @@ export function generateSchedule(
             remaining = Math.max(0, remaining - duration);
             budget -= duration;
             dayUsed.set(date, dayUsed.get(date)! + duration);
-            slot.start = end + preferences.restMinutes * minute;
+            // Rest spans free-window/day boundaries too (including short appointments).
+            const padding = preferences.restMinutes * minute;
+            for (const ranges of slots.values())
+              for (const range of ranges)
+                if (range.start < end + padding && range.end > start - padding) {
+                  if (range.start >= start) range.start = Math.max(range.start, end + padding);
+                  else range.end = Math.min(range.end, start - padding);
+                }
           }
         }
       }

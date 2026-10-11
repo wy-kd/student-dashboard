@@ -138,11 +138,11 @@ test('timer event waits are bounded, abortable and isolated by owner', async () 
   await aborted.changed;
   aborted.close();
 });
-test('Today and Weekly Review retain useful sections without automatic planning controls', () => {
+test('Today and Weekly Review retain useful sections without the removed automatic-save planner', () => {
   const source = readFileSync(new URL('../components/DailyPlanning.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /DayPlanner|Plan My Day|Plan Next Week|suggestDay|plan.save/);
   assert.match(source, /export function Today/);
-  assert.match(source, /Classes & study/);
+  assert.match(source, /Today’s schedule/);
   assert.match(source, /Recommended work/);
   assert.match(source, /export function WeeklyReview/);
 });

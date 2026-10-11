@@ -4141,3 +4141,15 @@ td:first-child {
 .planned-work-editor .assignment-dialog-body {
   overflow-y: auto;
 }
+.planned-review-title,
+.planning-workspace p,
+.planning-workspace strong {
+  overflow-wrap: anywhere;
+}
+.planned-work-editor .field,
+.planned-work-editor input,
+.planned-work-editor select,
+.planned-work-editor textarea {
+  min-width: 0;
+  max-width: 100%;
+}

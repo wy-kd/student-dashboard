@@ -151,3 +151,61 @@ test('V3 scheduling backup/restore is transactional; V1/V2 remain supported and 
   await restoreBackup(oldest);
   assert.equal(await db.task.count(), backup.data.task.length);
 });
+
+test('V3 backup preserves a legitimate stale plan association for review instead of rewriting or refusing the snapshot', async () => {
+  const { exportBackup, restoreBackup } = await import('../lib/backup');
+  const semester = await saveRow('semester', {
+    ...defaults('semester'),
+    name: 'Snapshot semester',
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    teachingStart: '2026-01-01',
+  });
+  const subject = await saveRow('subject', {
+    ...defaults('subject'),
+    semesterId: semester.id,
+    code: 'TEST',
+    name: 'Snapshot subject',
+  });
+  const first = await saveRow('assignment', {
+    ...defaults('assignment'),
+    subjectId: subject.id,
+    name: 'Original context',
+    dueAt: '2026-11-01T10:00',
+  });
+  const second = await saveRow('assignment', {
+    ...defaults('assignment'),
+    subjectId: subject.id,
+    name: 'Changed context',
+    dueAt: '2026-11-02T10:00',
+  });
+  const task = await saveRow('task', {
+    ...defaults('task'),
+    assignmentId: first.id,
+    name: 'Reassociated work',
+    estimatedHours: 2,
+  });
+  await db.plannedWorkBlock.create({
+    data: {
+      userId: 'owner',
+      name: 'Original intention',
+      workKey: 'task:' + task.id,
+      taskId: task.id,
+      assignmentId: first.id,
+      startAt: 1e12,
+      endAt: 1e12 + 3600000,
+    },
+  });
+  await db.task.update({ where: { id: task.id }, data: { assignmentId: second.id } });
+  const backup = await exportBackup();
+  await restoreBackup(backup);
+  assert.equal((await db.task.findUnique({ where: { id: task.id } }))!.assignmentId, second.id);
+  assert.equal(
+    (await db.plannedWorkBlock.findFirst({ where: { taskId: task.id } }))!.assignmentId,
+    first.id,
+  );
+  const invalid = structuredClone(backup);
+  invalid.scheduling.plannedWorkBlock.find((b: any) => b.taskId === task.id)!.workKey =
+    'unsupported:record';
+  await assert.rejects(restoreBackup(invalid), /Invalid planned work key/);
+});
