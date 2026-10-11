@@ -3,6 +3,7 @@ import { DateTimeInput } from './DateTimeInput';
 import { formatDate, formatTime } from '@/lib/format';
 import { useState } from 'react';
 import { SchedulePlanning } from './SchedulePlanning';
+import { PlannedWorkRow, PlannedWorkDetails } from './PlannedWork';
 import { SemesterWeek } from './SemesterWeek';
 import { StudyTimer } from './StudyTimer';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -23,9 +24,10 @@ import {
 } from '@/lib/calculations';
 import type { Entity } from '@/lib/model';
 export function Calendar({ timetable = false }: { timetable?: boolean }) {
-  const { data: d, now, open } = useApp();
+  const { data: d, now, open, go } = useApp();
   const [view, setView] = useState(timetable ? 'Week' : 'Month'),
-    [anchor, setAnchor] = useState(now.slice(0, 10));
+    [anchor, setAnchor] = useState(now.slice(0, 10)),
+    [selectedBlock, setSelectedBlock] = useState<string | null>(null);
   const monday = addDays(anchor, -((weekday(anchor) + 6) % 7)),
     first = anchor.slice(0, 7) + '-01';
   let start =
@@ -37,7 +39,13 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
   const count = view === 'Month' ? 42 : view === 'Week' ? 7 : 1;
   const days = Array.from({ length: count }, (_, i) => addDays(start, i));
   const events = calendarEvents(d, start, days.at(-1)!).filter(
-    (e) => !timetable || e.entity === 'class' || e.entity === 'studySession' || e.kind === 'Break',
+    (e) =>
+      !timetable ||
+      e.entity === 'class' ||
+      e.entity === 'studySession' ||
+      e.entity === 'plannedWorkBlock' ||
+      e.entity === 'commitment' ||
+      e.kind === 'Break',
   );
   const move = (n: number) => {
     if (view === 'Month') {
@@ -96,9 +104,12 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
           const daily = events.filter(
             (e) =>
               e.start.slice(0, 10) === day ||
-              (e.entity === 'importantDate' &&
+              (['importantDate', 'plannedWorkBlock', 'commitment'].includes(e.entity) &&
                 e.start.slice(0, 10) <= day &&
-                (e.end ?? e.start).slice(0, 10) >= day),
+                (e.end ?? e.start).slice(0, 10) >= day &&
+                (!['plannedWorkBlock', 'commitment'].includes(e.entity) ||
+                  e.end?.slice(0, 10) !== day ||
+                  e.end?.slice(11) !== '00:00')),
           );
           return (
             <div
@@ -137,12 +148,15 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
                     borderLeftColor:
                       d.subject.find((s) => s.id === e.subjectId)?.color ?? '#8290a8',
                   }}
-                  onClick={() =>
-                    open({
-                      entity: e.entity as Entity,
-                      row: d[e.entity as Entity].find((x) => x.id === e.id),
-                    })
-                  }
+                  onClick={() => {
+                    if (e.entity === 'plannedWorkBlock') setSelectedBlock(e.id);
+                    else if (e.entity === 'commitment') go('/settings#availability');
+                    else
+                      open({
+                        entity: e.entity as Entity,
+                        row: d[e.entity as Entity].find((x) => x.id === e.id),
+                      });
+                  }}
                 >
                   <span>
                     {e.kind === 'Break'
@@ -163,6 +177,9 @@ export function Calendar({ timetable = false }: { timetable?: boolean }) {
           );
         })}
       </div>
+      {selectedBlock && (
+        <PlannedWorkDetails id={selectedBlock} close={() => setSelectedBlock(null)} />
+      )}
       {timetable && (
         <Section
           title="Manage recurring classes"
@@ -259,6 +276,22 @@ export function Study() {
           </div>
         </Section>
       </details>
+      <Section
+        title="Confirmed planned work"
+        sub="Approved intentions; actual study remains in your existing history."
+      >
+        {(d.planning?.blocks ?? [])
+          .filter((b) => b.state !== 'dismissed')
+          .sort((a, b) => a.startAt - b.startAt)
+          .map((b) => (
+            <PlannedWorkRow key={b.id} block={b} />
+          ))}
+        {!d.planning?.blocks.some((b) => b.state !== 'dismissed') && (
+          <p className="muted">
+            No confirmed allocations yet. Review a proposal or keep using manual study sessions.
+          </p>
+        )}
+      </Section>
       <Section title="Planned & completed sessions">
         <SimpleRows
           entity="studySession"
@@ -450,7 +483,7 @@ export function Analytics() {
       </div>
       <Section
         title="Workload forecast"
-        sub={`Estimated remaining work spread across available days. Your capacity: ${d.setting.dailyHours}h/day.`}
+        sub={`Estimated remaining work spread across available days. Your daily target: ${d.setting.dailyHours}h/day. Exact availability is configured separately.`}
         action={
           <div className="tabs">
             {[7, 14, 30].map((n) => (
@@ -488,7 +521,7 @@ export function Analytics() {
           ))}
         </div>
         <p className="muted">
-          Amber bars exceed your daily capacity. Assessment hours and their linked tasks are counted
+          Amber bars exceed your daily target. Assessment hours and their linked tasks are counted
           once. Combined weightings below may span several subjects.
         </p>
         {f.collisions.map((c) => (

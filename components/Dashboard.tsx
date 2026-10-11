@@ -27,6 +27,7 @@ import {
 import { SemesterWeek } from './SemesterWeek';
 import { StudyTimer } from './StudyTimer';
 import { TodoList } from './TodoList';
+import { PlannedWorkDetails } from './PlannedWork';
 import { Today, WeeklySummary } from './DailyPlanning';
 export function Dashboard({ todayOnly = false }: { todayOnly?: boolean }) {
   if (todayOnly) return <Today />;
@@ -35,6 +36,7 @@ export function Dashboard({ todayOnly = false }: { todayOnly?: boolean }) {
 function WidgetDashboard() {
   const { data: d, now, go, open, state, act, notify } = useProductivity();
   const [editing, setEditing] = useState(false),
+    [selectedBlock, setSelectedBlock] = useState<string | null>(null),
     [layout, setLayout] = useState<Layout>(() => readLayout(state?.preference?.layout)),
     [bp, setBp] = useState<Breakpoint>('desktop'),
     [drag, setDrag] = useState<WidgetId | null>(null),
@@ -53,8 +55,8 @@ function WidgetDashboard() {
   const today = now.slice(0, 10),
     rank = priorities(d, now),
     semester = d.semester.find((s) => s.id === d.setting.activeSemesterId) ?? d.semester[0];
-  const schedule = calendarEvents(d, today, today).filter(
-    (e) => e.entity === 'class' || e.entity === 'studySession',
+  const schedule = calendarEvents(d, today, today).filter((e) =>
+    ['class', 'studySession', 'plannedWorkBlock', 'commitment', 'exam'].includes(e.entity),
   );
   const tasks = d.task.filter((t) => t.status !== 'Completed' && t.dueAt?.slice(0, 10) <= today);
   const upcoming = [
@@ -110,12 +112,15 @@ function WidgetDashboard() {
               {schedule.slice(0, 4).map((e) => (
                 <button
                   key={e.id}
-                  onClick={() =>
-                    open({
-                      entity: e.entity as any,
-                      row: d[e.entity as 'class'].find((x) => x.id === e.id),
-                    })
-                  }
+                  onClick={() => {
+                    if (e.entity === 'plannedWorkBlock') setSelectedBlock(e.id);
+                    else if (e.entity === 'commitment') go('/settings#availability');
+                    else
+                      open({
+                        entity: e.entity as any,
+                        row: d[e.entity as 'class'].find((x) => x.id === e.id),
+                      });
+                  }}
                 >
                   <time>{formatTime(e.start)}</time>
                   <span>{e.name}</span>
@@ -558,6 +563,9 @@ function WidgetDashboard() {
       </div>
       {!layout[bp].some((x) => !x.hidden) && (
         <Empty title="Your dashboard is clear" text="Use Edit Dashboard to add widgets." />
+      )}
+      {selectedBlock && (
+        <PlannedWorkDetails id={selectedBlock} close={() => setSelectedBlock(null)} />
       )}
     </>
   );

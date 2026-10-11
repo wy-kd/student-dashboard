@@ -140,6 +140,7 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
       const input = z
         .object({
           requestId: z.string().uuid(),
+          plannedBlockId: optionalId,
           name: z.string().trim().min(1).max(500),
           mode: z.enum(['countdown', 'stopwatch']),
           focusMinutes: z.number().int().min(1).max(240),
@@ -153,7 +154,65 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
         .strict()
         .parse(b.timer);
       const existing = await tx.studyTimer.findUnique({ where: { id: input.requestId } });
-      if (existing?.userId === userId) return existing;
+      if (existing?.userId === userId) {
+        if (input.plannedBlockId) {
+          const linked = await tx.plannedWorkBlock.findUnique({ where: { timerId: existing.id } });
+          if (linked?.id !== input.plannedBlockId)
+            throw new AppError('This timer request was used for another plan.', 409);
+        }
+        return existing;
+      }
+      let planned: any = null;
+      if (input.plannedBlockId) {
+        planned = await tx.plannedWorkBlock.findFirst({
+          where: { id: input.plannedBlockId, userId },
+        });
+        if (!planned || planned.state !== 'planned')
+          throw new AppError(
+            'This planned session is no longer available. Review the schedule.',
+            409,
+          );
+        if (planned.workKey) {
+          const [kind, id] = planned.workKey.split(':');
+          const source = await (tx as any)[kind].findUnique({ where: { id } });
+          if (
+            !source ||
+            source.status === 'Completed' ||
+            source.status === 'Submitted' ||
+            source.completed
+          )
+            throw new AppError('Linked work is completed or removed. Review this plan.', 409);
+        }
+        if (planned.taskId) {
+          const task = await tx.task.findUnique({ where: { id: planned.taskId } });
+          if (!task || task.assignmentId !== planned.assignmentId || task.examId !== planned.examId)
+            throw new AppError('Linked task changed. Review the plan before starting.', 409);
+          const parent = task.assignmentId
+            ? await tx.assignment.findUnique({ where: { id: task.assignmentId } })
+            : task.examId
+              ? await tx.exam.findUnique({ where: { id: task.examId } })
+              : null;
+          if (
+            parent &&
+            (('status' in parent &&
+              (parent.status === 'Submitted' || parent.status === 'Completed')) ||
+              ('completed' in parent && parent.completed))
+          )
+            throw new AppError('Linked assessment is completed. Review this plan.', 409);
+        }
+        Object.assign(input, {
+          name: planned.name,
+          taskId: planned.taskId,
+          assignmentId: planned.assignmentId,
+          examId: planned.examId,
+          focusMinutes: Math.min(
+            240,
+            Math.max(1, Math.ceil((planned.endAt - planned.startAt) / 60000)),
+          ),
+          rounds: 1,
+          mode: 'countdown',
+        });
+      }
       if (await tx.studyTimer.findUnique({ where: { activeKey: userId } }))
         throw new AppError('A timer is already active. Refresh to use it.', 409);
       const links: any = {
@@ -172,8 +231,8 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
       }
       if (links.assignmentId && links.examId) throw new AppError('Choose one assessment.');
       await validateRelations(tx, 'studySession', links);
-      const { requestId, ...values } = input;
-      return tx.studyTimer.create({
+      const { requestId, plannedBlockId, ...values } = input;
+      const created = await tx.studyTimer.create({
         data: {
           ...values,
           ...links,
@@ -184,6 +243,12 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
           segmentAt: now,
         },
       });
+      if (planned)
+        await tx.plannedWorkBlock.update({
+          where: { id: planned.id },
+          data: { timerId: created.id, revision: { increment: 1 } },
+        });
+      return created;
     }
     const t = await tx.studyTimer.findUnique({ where: { id: idSchema.parse(b.id) } });
     if (!t || t.userId !== userId) throw new AppError('Timer not found.', 404);
@@ -240,6 +305,7 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
         .strict()
         .parse(b.completion);
       const setting = await tx.setting.findUnique({ where: { id: 'settings' } });
+      const planned = await tx.plannedWorkBlock.findUnique({ where: { timerId: t.id } });
       const session = await tx.studySession.create({
         data: {
           name: t.name,
@@ -247,7 +313,11 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
           assignmentId: t.assignmentId,
           examId: t.examId,
           dueAt: civilNow(setting?.timezone, new Date(t.startedAt)),
-          plannedHours: t.mode === 'countdown' ? (t.focusMinutes * t.round) / 60 : 0,
+          plannedHours: planned
+            ? (planned.endAt - planned.startAt) / 3600000
+            : t.mode === 'countdown'
+              ? (t.focusMinutes * t.round) / 60
+              : 0,
           actualHours: input.minutes / 60,
           completed: true,
           notes: input.note,
@@ -273,6 +343,11 @@ export async function timerAction(userId: string, b: any, now = Date.now()) {
             },
           });
       }
+      if (planned)
+        await tx.plannedWorkBlock.update({
+          where: { id: planned.id },
+          data: { sessionId: session.id, state: 'reviewed', revision: { increment: 1 } },
+        });
       // Time belongs only to StudySession. Never increment task/assessment manual hours as well.
       Object.assign(changes, {
         sessionId: session.id,

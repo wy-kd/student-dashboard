@@ -11,13 +11,20 @@ export async function planningSnapshot(client: any = db, userId = 'owner'): Prom
   );
   const recorded = await client.studyTimer.findMany({
     where: { userId, taskId: { not: null }, sessionId: { not: null } },
-    select: { taskId: true, session: { select: { actualHours: true } } },
+    select: { taskId: true, sessionId: true, session: { select: { actualHours: true } } },
+  });
+  const manual = await client.plannedWorkBlock.findMany({
+    where: { userId, taskId: { not: null }, sessionId: { not: null } },
+    select: { taskId: true, sessionId: true, session: { select: { actualHours: true } } },
   });
   const taskRecordedMinutes: Record<string, number> = {};
-  for (const timer of recorded)
-    if (timer.taskId && timer.session)
+  const counted = new Set<string>();
+  for (const timer of [...recorded, ...manual])
+    if (timer.taskId && timer.session && !counted.has(timer.sessionId!)) {
       taskRecordedMinutes[timer.taskId] =
         (taskRecordedMinutes[timer.taskId] ?? 0) + timer.session.actualHours * 60;
+      counted.add(timer.sessionId!);
+    }
   return {
     taskRecordedMinutes,
     preference: rows[0][0] ?? { userId, revision: 0, ...defaultPlanningPreferences },

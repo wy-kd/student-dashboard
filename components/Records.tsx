@@ -1,4 +1,5 @@
 'use client';
+import { PlannedWorkRow } from './PlannedWork';
 import { formatDate, formatTime, formatDateTime } from '@/lib/format';
 import { useState } from 'react';
 import { AssignmentBreakdown } from './AssignmentBreakdown';
@@ -17,13 +18,7 @@ import {
   Badge,
   Due,
 } from './ui';
-import {
-  assignmentProgress,
-  examProgress,
-  health,
-  remaining,
-  round,
-} from '@/lib/calculations';
+import { assignmentProgress, examProgress, health, remaining, round } from '@/lib/calculations';
 import { fields, type Entity, type RecordRow } from '@/lib/model';
 export function Heading({
   title,
@@ -461,6 +456,27 @@ export function Detail({ entity, id }: { entity: 'assignment' | 'exam' | 'subjec
       {breaking && entity === 'assignment' && (
         <AssignmentBreakdown key={r.id} assignment={r} close={() => setBreaking(false)} />
       )}
+      <Section title="Confirmed planned work">
+        {(d.planning?.blocks ?? [])
+          .filter(
+            (b) =>
+              b.state !== 'dismissed' &&
+              (isSubject
+                ? d.task.find((t) => t.id === b.taskId)?.subjectId === id ||
+                  d.assignment.find((a) => a.id === b.assignmentId)?.subjectId === id ||
+                  d.exam.find((e) => e.id === b.examId)?.subjectId === id
+                : exam
+                  ? b.examId === id
+                  : b.assignmentId === id),
+          )
+          .sort((a, b) => a.startAt - b.startAt)
+          .map((b) => (
+            <PlannedWorkRow key={b.id} block={b} />
+          ))}
+        <button type="button" className="text-button" onClick={() => go('/study')}>
+          Review scheduling suggestions
+        </button>
+      </Section>
       <Section
         title="Study sessions"
         action={

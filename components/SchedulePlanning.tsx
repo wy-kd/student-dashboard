@@ -23,7 +23,7 @@ const draftFor = (block: SuggestedBlock, zone: string): Draft => ({
   locked: false,
 });
 export function SchedulePlanning() {
-  const { allData: d, now, reload, go } = useApp(),
+  const { data: scoped, allData: d, now, reload, go } = useApp(),
     today = now.slice(0, 10),
     zone = d.setting.timezone;
   const [range, setRange] = useState({ startDate: today, endDate: addDays(today, 6) }),
@@ -35,14 +35,19 @@ export function SchedulePlanning() {
     [excluded, setExcluded] = useState<string[]>([]),
     [uncertain, setUncertain] = useState(false);
   const pending = useRef<any>(null),
-    allWork = workItems(d, Date.now()).items;
+    allWork = workItems(scoped, Date.now()).items;
   async function generate(startDate = range.startDate, endDate = range.endDate) {
     if (busy || uncertain) return;
     setBusy(true);
     setError('');
     setMessage('');
     try {
-      const p = await requestPlanning('schedule.generate', { startDate, endDate, excluded });
+      const p = await requestPlanning('schedule.generate', {
+        startDate,
+        endDate,
+        excluded,
+        semesterId: scoped.setting.activeSemesterId,
+      });
       setRange({ startDate, endDate });
       setPreview(p);
       setRows(p.suggestions.map((b: SuggestedBlock) => draftFor(b, zone)));

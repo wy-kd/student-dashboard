@@ -7,6 +7,8 @@ import { SchedulePlanning } from '../components/SchedulePlanning';
 import { generateSchedule } from '../lib/planning-engine';
 import { instant } from '../lib/planning-time';
 import { Availability } from '../components/Availability';
+import { Calendar } from '../components/Planning';
+import { Today } from '../components/DailyPlanning';
 import { entities, type Data } from '../lib/model';
 import { availabilitySchema, defaultPlanningPreferences } from '../lib/planning-model';
 const { JSDOM } = createRequire(import.meta.url)('jsdom');
@@ -56,6 +58,9 @@ const data = {
 } as unknown as Data;
 let approvalWrites = 0,
   interruptApproval = false;
+let lastNavigation = '',
+  timerStarts = 0,
+  timerPayload: any;
 const approvalRequests: any[] = [];
 const approved = new Map<string, any>();
 let node: React.ReactNode,
@@ -78,7 +83,9 @@ function tree() {
         save: async () => {},
         remove: async () => {},
         notify() {},
-        go() {},
+        go(url: string) {
+          lastNavigation = url;
+        },
       },
     },
     node,
@@ -120,6 +127,13 @@ async function submit(form: HTMLFormElement) {
   });
 }
 globalThis.fetch = async (_url: any, init: any) => {
+  if (_url === '/api/productivity') {
+    const payload = JSON.parse(init.body);
+    assert.equal(payload.action, 'timer.start');
+    timerStarts++;
+    timerPayload = payload.timer;
+    return new Response(JSON.stringify({ result: { id: payload.timer.requestId } }));
+  }
   const { action, data: payload } = JSON.parse(init.body);
   lastPayload = payload;
   if (fail)
@@ -273,6 +287,71 @@ test('Scheduling preview edits and selective approval retain uncertain requests,
   assert.equal(data.task[0].status, 'Not Started');
 });
 
+test('Today and Timetable render confirmed plans and appointments; Calendar selection carries context into the existing timer', async () => {
+  fail = false;
+  data.planning!.blocks = [
+    {
+      id: 'calendar-plan',
+      userId: 'owner',
+      name: 'Planned task focus',
+      workKey: 'task:ui-work',
+      taskId: 'ui-work',
+      assignmentId: null,
+      examId: null,
+      startAt: instant('2026-10-12T10:00', 'Australia/Brisbane'),
+      endAt: instant('2026-10-12T11:00', 'Australia/Brisbane'),
+      state: 'planned',
+      origin: 'suggested',
+      locked: false,
+      revision: 0,
+      sessionId: null,
+      timerId: null,
+    },
+  ];
+  data.planning!.commitments = [
+    {
+      id: 'appointment',
+      name: 'Recorded appointment',
+      startAt: instant('2026-10-12T12:00', 'Australia/Brisbane'),
+      endAt: instant('2026-10-12T13:00', 'Australia/Brisbane'),
+      fixed: true,
+    },
+  ];
+  data.task = [
+    {
+      id: 'ui-work',
+      name: 'UI research',
+      subjectId: null,
+      assignmentId: null,
+      examId: null,
+      status: 'Not Started',
+      estimatedHours: 2,
+      actualHours: 0,
+      dueAt: '2026-10-12T18:00',
+      priority: 'Medium',
+    },
+  ];
+  await render(React.createElement(Today));
+  assert.match(document.body.textContent!, /1\.0h intended/);
+  assert.ok(button('Start planned session'));
+  await click(button('Start planned session'));
+  assert.equal(timerStarts, 1);
+  assert.equal(timerPayload.plannedBlockId, 'calendar-plan');
+  assert.equal(timerPayload.focusMinutes, 60);
+  assert.equal(lastNavigation, '/focus');
+  await render(React.createElement(Calendar, { timetable: true }));
+  const planEvent = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+    b.textContent?.includes('Planned task focus'),
+  )!;
+  assert.ok(planEvent);
+  assert.match(document.body.textContent!, /Recorded appointment/);
+  await click(planEvent);
+  assert.ok(document.querySelector('dialog[open]'));
+  assert.match(document.querySelector('dialog')!.textContent!, /Task details/);
+  await click(button('Close', document.querySelector('dialog')!));
+  assert.ok(!document.querySelector('dialog'));
+  assert.equal(data.studySession.length, 0, 'viewing/starting from Calendar does not record work');
+});
 test.after(async () => {
   await act(async () => root.unmount());
   globalThis.fetch = oldFetch;

@@ -1,4 +1,4 @@
-import { addDays, civilNow } from './calculations';
+import { addDays, civilNow } from './civil';
 import { validDate } from './validation';
 export type Interval = { start: number; end: number };
 export const minute = 60000;

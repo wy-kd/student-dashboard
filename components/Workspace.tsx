@@ -1,4 +1,5 @@
 'use client';
+import { blockSubjectId } from '@/lib/planning-view';
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -41,6 +42,15 @@ function scopeData(d: Data, id: string): Data {
   return {
     ...d,
     setting: { ...d.setting, activeSemesterId: id },
+    planning: d.planning
+      ? {
+          ...d.planning,
+          blocks: d.planning.blocks.filter((b) => {
+            const subjectId = blockSubjectId(d, b);
+            return !subjectId || ids.has(subjectId);
+          }),
+        }
+      : undefined,
     semester: d.semester.filter((s) => s.id === id),
     subject: subjects,
     assignment: assignments,

@@ -1,19 +1,23 @@
 'use client';
 import { formatDate, formatTime } from '@/lib/format';
 import { useApp } from './context';
+import { PlannedWorkRow } from './PlannedWork';
+import { SchedulePlanning } from './SchedulePlanning';
+import { todayPlanning } from '@/lib/planning-view';
+import { instant } from '@/lib/planning-time';
 import { Section, Empty, TaskRow } from './ui';
 import { calendarEvents, priorities, addDays } from '@/lib/calculations';
 import { weeklyReview } from '@/lib/weekly-review';
 export function Today() {
-  const { data: d, now, open, go } = useApp(),
+  const { data: d, allData, now, open, go } = useApp(),
     today = now.slice(0, 10),
-    schedule = calendarEvents(d, today, today).filter(
-      (e) => e.entity === 'class' || e.entity === 'studySession',
-    ),
-    tasks = d.task.filter((t) => t.status !== 'Completed' && t.dueAt?.slice(0, 10) <= today),
-    planned = d.studySession
-      .filter((s) => s.dueAt.slice(0, 10) === today)
-      .reduce((n, s) => n + s.plannedHours, 0);
+    stamp = instant(now, d.setting.timezone),
+    summary = todayPlanning(d, today, stamp, allData),
+    tasks = summary.tasks,
+    shown = new Set(tasks.map((t) => t.id));
+  const schedule = calendarEvents(d, today, today).filter((e) =>
+    ['class', 'studySession', 'plannedWorkBlock', 'commitment', 'exam'].includes(e.entity),
+  );
   return (
     <>
       <div className="page-heading">
@@ -21,31 +25,44 @@ export function Today() {
           <p className="eyebrow">{formatDate(today)}</p>
           <h1>Today</h1>
           <p>
-            {planned.toFixed(1)}h planned · {Math.max(0, d.setting.dailyHours - planned).toFixed(1)}
-            h of study capacity remaining
+            {(summary.plannedMinutes / 60).toFixed(1)}h intended ·{' '}
+            {(summary.recordedMinutes / 60).toFixed(1)}h recorded ·{' '}
+            {(summary.remainingMinutes / 60).toFixed(1)}h future confirmed allocation ·{' '}
+            {summary.availableMinutes == null
+              ? 'availability not configured'
+              : (summary.availableMinutes / 60).toFixed(1) + 'h remaining known availability'}
+          </p>
+          <p className="muted">
+            Daily target: {d.setting.dailyHours}h. Planned allocations are not completed work.
           </p>
         </div>
       </div>
       <div className="two-columns">
-        <Section title="Classes & study">
-          {schedule.map((e) => (
-            <button
-              className="schedule-item"
-              key={e.id}
-              onClick={() =>
-                open({
-                  entity: e.entity as any,
-                  row: d[e.entity as 'class'].find((r) => r.id === e.id),
-                })
-              }
-            >
-              <time>{formatTime(e.start)}</time>
-              <span>
-                <strong>{e.name}</strong>
-                <small>{e.kind}</small>
-              </span>
-            </button>
-          ))}
+        <Section title="Today’s schedule">
+          {schedule.map((e) =>
+            e.entity === 'plannedWorkBlock' ? (
+              <PlannedWorkRow key={e.id} block={d.planning!.blocks.find((b) => b.id === e.id)!} />
+            ) : (
+              <button
+                className="schedule-item"
+                key={e.id}
+                onClick={() => {
+                  if (e.entity === 'commitment') go('/settings#availability');
+                  else
+                    open({
+                      entity: e.entity as any,
+                      row: d[e.entity as 'class'].find((r) => r.id === e.id),
+                    });
+                }}
+              >
+                <time>{formatTime(e.start)}</time>
+                <span>
+                  <strong>{e.name}</strong>
+                  <small>{e.kind}</small>
+                </span>
+              </button>
+            ),
+          )}
           {!schedule.length && (
             <Empty
               title="No sessions planned today"
@@ -54,7 +71,7 @@ export function Today() {
             />
           )}
         </Section>
-        <Section title="Due & overdue tasks">
+        <Section title="Today’s tasks">
           {tasks.map((t) => (
             <TaskRow key={t.id} row={t} />
           ))}
@@ -63,11 +80,13 @@ export function Today() {
           )}
         </Section>
       </div>
+      <SchedulePlanning />
       <Section title="Upcoming assignment tasks">
         {d.task
           .filter(
             (t) =>
               t.assignmentId &&
+              !shown.has(t.id) &&
               t.status !== 'Completed' &&
               t.dueAt?.slice(0, 10) > today &&
               t.dueAt.slice(0, 10) <= addDays(today, 7),
@@ -85,7 +104,10 @@ export function Today() {
         {priorities(d, now)
           .filter((r) => r.entity === 'assignment')
           .map((r) =>
-            d.task.find((t) => t.assignmentId === r.id && t.status !== 'Completed' && !t.dueAt),
+            d.task.find(
+              (t) =>
+                t.assignmentId === r.id && t.status !== 'Completed' && !t.dueAt && !shown.has(t.id),
+            ),
           )
           .filter((t): t is NonNullable<typeof t> => !!t)
           .slice(0, 5)

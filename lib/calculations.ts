@@ -1,30 +1,10 @@
+import { civilAt, instant } from './planning-time';
 import { teachingWeekInfo } from './teaching-weeks';
 import type { Data, RecordRow } from './model';
 export const clamp = (n: number, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 export const round = (n: number) => Math.round(n * 10) / 10;
-export function civilNow(timezone = 'Australia/Brisbane', date = new Date()) {
-  const p = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(date)
-      .map((x) => [x.type, x.value]),
-  );
-  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
-}
-export function dayNumber(s: string) {
-  return Date.parse(s.slice(0, 10) + 'T00:00:00Z') / 86400000;
-}
-export function addDays(s: string, n: number) {
-  return new Date((dayNumber(s) + n) * 86400000).toISOString().slice(0, 10);
-}
-export const weekday = (s: string) => new Date(s.slice(0, 10) + 'T12:00:00Z').getUTCDay();
+export { civilNow, dayNumber, addDays, weekday } from './civil';
+import { dayNumber, addDays, weekday } from './civil';
 export const daysUntil = (due: string, now: string) => dayNumber(due) - dayNumber(now);
 export function countdown(due: string, now: string, exam = false) {
   const n = daysUntil(due, now);
@@ -205,6 +185,12 @@ export type CalendarEvent = {
 };
 export function calendarEvents(d: Data, start: string, end: string): CalendarEvent[] {
   const events: CalendarEvent[] = [];
+  const linkedSessions = new Set(
+    (d.planning?.blocks ?? [])
+      .filter((b) => b.state !== 'dismissed')
+      .map((b) => b.sessionId)
+      .filter(Boolean),
+  );
   for (const [entity, kind] of [
     ['assignment', 'Assignment'],
     ['exam', 'Exam'],
@@ -214,7 +200,12 @@ export function calendarEvents(d: Data, start: string, end: string): CalendarEve
     ['importantDate', 'Important'],
   ] as const) {
     for (const x of d[entity])
-      if (x.dueAt && x.dueAt.slice(0, 10) <= end && (x.endDate ?? x.dueAt.slice(0, 10)) >= start)
+      if (
+        !(entity === 'studySession' && linkedSessions.has(x.id)) &&
+        x.dueAt &&
+        x.dueAt.slice(0, 10) <= end &&
+        (x.endDate ?? x.dueAt.slice(0, 10)) >= start
+      )
         events.push({
           id: x.id,
           entity,
@@ -257,6 +248,34 @@ export function calendarEvents(d: Data, start: string, end: string): CalendarEve
             kind: c.kind,
           });
       }
+  const rangeStart = instant(start + 'T00:00', d.setting.timezone),
+    rangeEnd = instant(addDays(end, 1) + 'T00:00', d.setting.timezone);
+  for (const block of d.planning?.blocks ?? [])
+    if (block.state !== 'dismissed' && block.startAt < rangeEnd && block.endAt > rangeStart) {
+      const subjectId =
+        d.task.find((t) => t.id === block.taskId)?.subjectId ??
+        d.assignment.find((a) => a.id === block.assignmentId)?.subjectId ??
+        d.exam.find((e) => e.id === block.examId)?.subjectId;
+      events.push({
+        id: block.id,
+        entity: 'plannedWorkBlock',
+        name: block.name,
+        start: civilAt(block.startAt, d.setting.timezone),
+        end: civilAt(block.endAt, d.setting.timezone),
+        subjectId,
+        kind: block.state === 'reviewed' ? 'Reviewed study' : 'Confirmed study',
+      });
+    }
+  for (const commitment of d.planning?.commitments ?? [])
+    if (commitment.startAt < rangeEnd && commitment.endAt > rangeStart)
+      events.push({
+        id: commitment.id,
+        entity: 'commitment',
+        name: commitment.name,
+        start: civilAt(commitment.startAt, d.setting.timezone),
+        end: civilAt(commitment.endAt, d.setting.timezone),
+        kind: commitment.fixed ? 'Fixed appointment' : 'Flexible commitment',
+      });
   return events.sort((a, b) => a.start.localeCompare(b.start));
 }
 export function workload(d: Data, now: string, horizon = 14) {

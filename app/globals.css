@@ -4110,3 +4110,34 @@ td:first-child {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.planned-work-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.planned-work-row .grow {
+  min-width: min(100%, 180px);
+  overflow-wrap: anywhere;
+}
+.planned-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.planned-work-actions button {
+  min-height: 44px;
+}
+.planned-work-editor > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.planned-work-editor .assignment-dialog-body {
+  overflow-y: auto;
+}
